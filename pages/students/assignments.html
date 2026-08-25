@@ -1,0 +1,262 @@
+<div class="page-header fade-in">
+  <div>
+    <h1>Assignments</h1>
+    <p>Track, submit, and review your course work.</p>
+  </div>
+  <button class="btn btn-ghost" data-nav="/students/results">View results</button>
+</div>
+
+<div class="card fade-in">
+  <div class="card-header">
+    <h2 class="section-title" style="margin:0">Upcoming &amp; past</h2>
+    <select id="assignment-status">
+      <option value="">All statuses</option>
+      <option value="pending">Pending</option>
+      <option value="submitted">Submitted</option>
+      <option value="graded">Graded</option>
+    </select>
+  </div>
+  <div class="card-body">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Assignment</th><th>Subject</th><th>Due</th><th>Status</th><th>Score</th><th></th></tr>
+        </thead>
+        <tbody id="assignments-body">
+          <tr><td colspan="6">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="submit-file-input" style="display:none" />
+
+<div class="submit-confirm-bar" id="confirm-bar" hidden>
+  <div class="submit-confirm-info">
+    <div class="submit-confirm-title" id="confirm-assignment-title"></div>
+    <div class="submit-confirm-file" id="confirm-filename"></div>
+  </div>
+  <div class="submit-confirm-actions">
+    <button class="btn btn-ghost btn-sm" id="confirm-preview-btn">Preview file</button>
+    <button class="btn btn-ghost btn-sm" id="confirm-cancel-btn">Cancel</button>
+    <button class="btn btn-primary btn-sm" id="confirm-submit-btn">Confirm &amp; submit</button>
+  </div>
+</div>
+
+<style>
+  .btn-sm { padding: var(--space-2) var(--space-4); font-size: 0.875rem; }
+  .row-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; justify-content: flex-end; }
+
+  .submit-confirm-bar {
+    position: sticky;
+    bottom: var(--space-5);
+    margin-top: var(--space-6);
+    background: var(--surface-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-lg);
+    padding: var(--space-4) var(--space-5);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-4);
+    flex-wrap: wrap;
+  }
+  .submit-confirm-title { font-weight: 600; }
+  .submit-confirm-file { font-size: 0.8125rem; color: var(--foreground-muted); word-break: break-all; }
+  .submit-confirm-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+
+  .file-preview-modal { max-width: 800px; }
+
+  @media (max-width: 640px) {
+    .submit-confirm-bar { flex-direction: column; align-items: stretch; bottom: var(--space-3); }
+    .submit-confirm-actions { justify-content: stretch; }
+    .submit-confirm-actions .btn { flex: 1; }
+  }
+</style>
+
+<script type="module">
+  const { get, postForm, del } = await import("../assets/js/api.js");
+  const { escapeHtml, formatDate } = await import("../assets/js/utils.js");
+  const { toast, confirmDialog } = await import("../assets/js/alerts.js");
+
+  const body = document.getElementById("assignments-body");
+  const statusFilter = document.getElementById("assignment-status");
+  const fileInput = document.getElementById("submit-file-input");
+  const confirmBar = document.getElementById("confirm-bar");
+  const confirmTitleEl = document.getElementById("confirm-assignment-title");
+  const confirmFilenameEl = document.getElementById("confirm-filename");
+  let allAssignments = [];
+  let pendingAssignmentId = null;
+  let pendingFile = null;
+  let pendingBlobUrl = null;
+  let submitting = false;
+
+  // Preview modal — appended to #modal-root (outside #content) so it never
+  // gets torn down, and shows the file without navigating away. Navigating
+  // to /viewer used to be how "Preview file" worked, but that replaces this
+  // whole page (and its script state) in the SPA, which is why the pending
+  // file picked for submission used to disappear after a preview.
+  function showPreview(url, title) {
+    const root = document.getElementById("modal-root");
+    const overlay = document.createElement("div");
+    overlay.className = "modal-overlay";
+    overlay.innerHTML = `
+      <div class="modal file-preview-modal" role="dialog" aria-modal="true">
+        <div class="modal-header">
+          <h3>${escapeHtml(title)}</h3>
+          <button class="icon-btn modal-close" aria-label="Close">&times;</button>
+        </div>
+        <div class="modal-body" style="padding:0;">
+          <iframe src="${url}" title="${escapeHtml(title)}" style="width:100%;height:70vh;border:0;display:block;"></iframe>
+        </div>
+      </div>`;
+    root.appendChild(overlay);
+    requestAnimationFrame(() => overlay.classList.add("open"));
+    const close = () => {
+      overlay.classList.remove("open");
+      setTimeout(() => overlay.remove(), 200);
+    };
+    overlay.querySelector(".modal-close").addEventListener("click", close);
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
+  }
+
+  function statusOf(a) {
+    if (!a.submission_id) return "pending";
+    return a.marks !== null && a.marks !== undefined ? "graded" : "submitted";
+  }
+
+  function badgeFor(status) {
+    if (status === "pending") return `<span class="badge badge-warning">Pending</span>`;
+    if (status === "submitted") return `<span class="badge badge-info">Submitted</span>`;
+    return `<span class="badge badge-success">Graded</span>`;
+  }
+
+  function render() {
+    const filter = statusFilter.value;
+    const rows = allAssignments.filter((a) => !filter || statusOf(a) === filter);
+    body.innerHTML = rows.length
+      ? rows.map((a) => {
+          const status = statusOf(a);
+          let actions = "";
+          if (status === "pending") {
+            actions = `<button class="btn btn-primary btn-sm submit-btn" data-id="${a.id}">Submit</button>`;
+          } else {
+            const viewBtn = a.submission_file_url
+              ? `<button class="btn btn-ghost btn-sm view-submission-btn" data-title="${escapeHtml(a.title)}" data-url="${escapeHtml(a.submission_file_url)}">View submission</button>`
+              : "";
+            const deleteBtn = status === "submitted"
+              ? `<button class="btn btn-danger btn-sm delete-submission-btn" data-id="${a.submission_id}">Delete</button>`
+              : "";
+            actions = `<div class="row-actions">${viewBtn}${deleteBtn}</div>`;
+          }
+          return `<tr>
+            <td data-label="Assignment"><strong>${escapeHtml(a.title)}</strong></td>
+            <td data-label="Subject">${escapeHtml(a.subject_name || "General")}</td>
+            <td data-label="Due">${a.deadline ? formatDate(a.deadline) : "—"}</td>
+            <td data-label="Status">${badgeFor(status)}</td>
+            <td data-label="Score">${a.marks !== null && a.marks !== undefined ? a.marks : "—"}</td>
+            <td>${actions}</td>
+          </tr>`;
+        }).join("")
+      : `<tr><td colspan="6"><div class="empty-state"><h3>Nothing here</h3><p>No assignments match this filter.</p></div></td></tr>`;
+
+    body.querySelectorAll(".submit-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        if (submitting) return; // a submission is already in flight
+        pendingAssignmentId = btn.dataset.id;
+        fileInput.click();
+      });
+    });
+    body.querySelectorAll(".view-submission-btn").forEach((btn) => {
+      btn.addEventListener("click", () => showPreview(btn.dataset.url, btn.dataset.title));
+    });
+    body.querySelectorAll(".delete-submission-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        confirmDialog({
+          title: "Delete submission",
+          message: "This removes your submitted file so you can upload the correct one. Continue?",
+          confirmText: "Delete",
+          onConfirm: async () => {
+            try {
+              await del(`/student/submissions/${btn.dataset.id}`);
+              toast("Submission deleted — you can resubmit now", "success");
+              allAssignments = await get("/student/assignments");
+              render();
+            } catch (err) {
+              toast(err.message || "Delete failed", "error");
+            }
+          },
+        });
+      });
+    });
+  }
+
+  function resetPending() {
+    if (pendingBlobUrl) URL.revokeObjectURL(pendingBlobUrl);
+    pendingFile = null;
+    pendingBlobUrl = null;
+    pendingAssignmentId = null;
+    fileInput.value = "";
+    confirmBar.hidden = true;
+  }
+
+  // Selecting a file doesn't upload it right away — the student previews
+  // it first ("you can't submit what you haven't seen") and confirms.
+  fileInput.addEventListener("change", () => {
+    if (!fileInput.files.length || !pendingAssignmentId) return;
+    if (pendingBlobUrl) URL.revokeObjectURL(pendingBlobUrl);
+    pendingFile = fileInput.files[0];
+    pendingBlobUrl = URL.createObjectURL(pendingFile);
+    const a = allAssignments.find((x) => x.id === pendingAssignmentId);
+    confirmTitleEl.textContent = a ? a.title : "Assignment";
+    confirmFilenameEl.textContent = pendingFile.name;
+    confirmBar.hidden = false;
+  });
+
+  document.getElementById("confirm-preview-btn").addEventListener("click", () => {
+    if (!pendingBlobUrl) return;
+    showPreview(pendingBlobUrl, pendingFile.name);
+  });
+
+  document.getElementById("confirm-cancel-btn").addEventListener("click", resetPending);
+
+  document.getElementById("confirm-submit-btn").addEventListener("click", async (e) => {
+    if (submitting || !pendingFile || !pendingAssignmentId) return;
+    submitting = true;
+    e.target.disabled = true;
+    e.target.textContent = "Submitting…";
+    const fd = new FormData();
+    fd.append("file", pendingFile);
+    fd.append("assignment_id", pendingAssignmentId);
+    try {
+      await postForm("/student/submit-assignment", fd);
+      toast("Assignment submitted", "success");
+    } catch (err) {
+      // 409 = the backend already has a submission for this assignment
+      // (e.g. it went through from another tab/click). Treat it as
+      // informational rather than an error, and refresh either way so
+      // the UI reflects the true state.
+      toast(err.status === 409 ? "You've already submitted this assignment" : (err.message || "Submission failed"), err.status === 409 ? "info" : "error");
+    } finally {
+      resetPending();
+      submitting = false;
+      e.target.disabled = false;
+      e.target.textContent = "Confirm & submit";
+      try {
+        allAssignments = await get("/student/assignments");
+        render();
+      } catch { /* keep showing the previous list if the refresh fails */ }
+    }
+  });
+
+  try {
+    allAssignments = await get("/student/assignments");
+    render();
+  } catch (err) {
+    body.innerHTML = `<tr><td colspan="6"><div class="empty-state"><h3>Couldn't load assignments</h3><p>${err.message}</p></div></td></tr>`;
+  }
+
+  statusFilter.addEventListener("change", render);
+</script>

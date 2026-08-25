@@ -1,0 +1,142 @@
+<div class="page-header fade-in">
+  <div>
+    <button class="btn btn-ghost btn-sm" id="back-btn">&larr; Back to companies</button>
+  </div>
+</div>
+
+<div id="detail-root" class="fade-in">
+  <div class="empty-state"><h3>Loading…</h3></div>
+</div>
+
+<style>
+  .btn-sm { padding: var(--space-2) var(--space-4); font-size: 0.875rem; }
+  .detail-header { display: flex; gap: var(--space-4); align-items: flex-start; margin-bottom: var(--space-5); }
+  .detail-logo { width: 4rem; height: 4rem; border-radius: var(--radius); background: var(--primary); color: var(--primary-foreground); display: grid; place-items: center; font-weight: 700; font-size: 1.5rem; flex-shrink: 0; overflow: hidden; }
+  .detail-logo img { width: 100%; height: 100%; object-fit: cover; }
+  .verified-badge { display: inline-flex; align-items: center; gap: 3px; color: var(--info); font-size: 0.75rem; font-weight: 700; }
+  .detail-title { font-size: 1.5rem; margin: 4px 0; }
+  .detail-section { margin-bottom: var(--space-5); }
+  .detail-section h3 { font-size: 1rem; margin-bottom: var(--space-2); }
+  .detail-section p { color: var(--foreground-muted); white-space: pre-wrap; line-height: 1.6; }
+  .detail-facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--space-4); }
+  .detail-fact { background: var(--surface); border-radius: var(--radius); padding: var(--space-3) var(--space-4); }
+  .detail-fact span { display: block; font-size: 0.75rem; color: var(--foreground-muted); text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 2px; }
+  .detail-fact strong { font-size: 1rem; }
+  .gallery-strip { display: flex; gap: var(--space-3); flex-wrap: wrap; }
+  .gallery-thumb { width: 140px; height: 100px; border-radius: var(--radius); overflow: hidden; background: var(--surface); }
+  .gallery-thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .contact-row { display: flex; gap: var(--space-2); font-size: 0.875rem; align-items: center; color: var(--foreground-muted); }
+  .company-intern-row { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); padding: var(--space-4) 0; border-bottom: 1px solid var(--border-subtle); flex-wrap: wrap; }
+  .company-intern-row:last-child { border-bottom: none; }
+  .intern-trade-badges { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0; }
+</style>
+
+<script type="module">
+  const { get, post } = await import("../../assets/js/api.js");
+  const { escapeHtml, formatDate } = await import("../../assets/js/utils.js");
+  const { toast, confirmDialog } = await import("../../assets/js/alerts.js");
+  const { formatRWF, internshipInitials } = await import("../../assets/js/internships.js");
+  const { navigate } = await import("../../assets/js/router.js");
+
+  const root = document.getElementById("detail-root");
+  document.getElementById("back-btn").addEventListener("click", () => navigate("/students/companies"));
+
+  const id = sessionStorage.getItem("umunara_company_id");
+  if (!id) {
+    root.innerHTML = `<div class="empty-state"><h3>No company selected</h3><p>Go back and pick one from the list.</p></div>`;
+  } else {
+    try {
+      const c = await get(`/student/companies/${id}`);
+      root.innerHTML = `
+        <div class="card">
+          <div class="card-body">
+            <div class="detail-header">
+              <div class="detail-logo">${c.logo_url ? `<img src="${escapeHtml(c.logo_url)}" alt="" />` : internshipInitials(c.name)}</div>
+              <div>
+                <div>${c.verified ? `<span class="verified-badge"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Verified company</span>` : ""}</div>
+                <h1 class="detail-title">${escapeHtml(c.name)}</h1>
+                ${c.trades && c.trades.length ? c.trades.map((t) => `<span class="badge badge-info" style="margin-right:4px">${escapeHtml(t.name)}</span>`).join("") : ""}
+              </div>
+            </div>
+
+            ${c.gallery_images && c.gallery_images.length ? `<div class="detail-section"><h3>Gallery</h3><div class="gallery-strip">${c.gallery_images.map((url) => `<div class="gallery-thumb"><img src="${escapeHtml(url)}" alt="" /></div>`).join("")}</div></div>` : ""}
+
+            <div class="detail-section">
+              <h3>About ${escapeHtml(c.name)}</h3>
+              <p>${escapeHtml(c.description || "No description provided.")}</p>
+            </div>
+
+            <div class="detail-section">
+              <h3>Company facts</h3>
+              <div class="detail-facts">
+                <div class="detail-fact"><span>Location</span><strong>${escapeHtml(c.district || "—")}${c.province ? ", " + escapeHtml(c.province) : ""}</strong></div>
+                <div class="detail-fact"><span>Industry</span><strong>${escapeHtml(c.industry || "—")}</strong></div>
+                <div class="detail-fact"><span>Employees</span><strong>${escapeHtml(c.employee_count || "—")}</strong></div>
+                <div class="detail-fact"><span>Founded</span><strong>${c.founded_year || "—"}</strong></div>
+              </div>
+            </div>
+
+            <div class="detail-section" style="margin-bottom:0">
+              <h3>Contact</h3>
+              ${c.address ? `<div class="contact-row">📍 ${escapeHtml(c.address)}</div>` : ""}
+              ${c.phone ? `<div class="contact-row">📞 ${escapeHtml(c.phone)}</div>` : ""}
+              ${c.email ? `<div class="contact-row">✉️ ${escapeHtml(c.email)}</div>` : ""}
+              ${c.website ? `<div class="contact-row">🔗 ${escapeHtml(c.website)}</div>` : ""}
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:var(--space-6)">
+          <div class="card-header"><h2 class="section-title" style="margin:0">Open internships</h2></div>
+          <div class="card-body">
+            ${c.internships.filter((i) => i.status === "open").length
+              ? c.internships.filter((i) => i.status === "open").map((i) => `
+                <div class="company-intern-row">
+                  <div>
+                    <strong>${escapeHtml(i.title)}</strong>
+                    ${i.trades && i.trades.length
+                      ? `<div class="intern-trade-badges">${i.trades.map((t) => `<span class="badge badge-info">${escapeHtml(t.name)}</span>`).join("")}</div>`
+                      : `<div class="intern-trade-badges"><span class="badge">Any trade</span></div>`}
+                    <div style="font-size:0.8125rem;color:var(--foreground-muted)">
+                      ${i.positions_available}/${i.positions_total} positions
+                      ${i.deadline ? " · Deadline: " + formatDate(i.deadline) : ""}
+                    </div>
+                  </div>
+                  <div style="display:flex;gap:var(--space-2);align-items:center">
+                    <span style="font-size:0.8125rem;color:var(--foreground-muted)">${formatRWF(i.registration_fee)}</span>
+                    <button class="btn btn-primary btn-sm apply-btn" data-id="${i.id}" ${i.positions_available <= 0 ? "disabled" : ""}>${i.positions_available <= 0 ? "Full" : "Apply"}</button>
+                  </div>
+                </div>`).join("")
+              : `<div class="empty-state"><h3>No open internships right now</h3><p>Check back later — this company may publish new ones.</p></div>`}
+          </div>
+        </div>`;
+
+      root.querySelectorAll(".apply-btn").forEach((btn) => btn.addEventListener("click", async () => {
+        btn.disabled = true;
+        btn.textContent = "Applying…";
+        try {
+          await post(`/student/internships/${btn.dataset.id}/apply`, {});
+          toast("Application submitted!", "success");
+          btn.textContent = "Applied ✓";
+        } catch (err) {
+          const msg = err.message || "Could not apply";
+          btn.disabled = false;
+          btn.textContent = "Apply";
+          if (/trade/i.test(msg)) {
+            confirmDialog({
+              title: "Complete your profile first",
+              message: "You need to set your trade in your profile before you can apply to internships. Would you like to do that now?",
+              confirmText: "Update profile",
+              cancelText: "Not now",
+              onConfirm: () => navigate("/students/internships/applications"),
+            });
+          } else {
+            toast(msg, "error");
+          }
+        }
+      }));
+    } catch (err) {
+      root.innerHTML = `<div class="empty-state"><h3>Couldn't load company</h3><p>${err.message}</p></div>`;
+    }
+  }
+</script>

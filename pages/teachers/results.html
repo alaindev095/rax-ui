@@ -1,0 +1,143 @@
+<div class="page-header fade-in">
+  <div>
+    <h1>Class Results</h1>
+    <p>Grading overview and marks entry for your subjects.</p>
+  </div>
+  <button class="btn btn-ghost" data-nav="/teachers/submissions">View submissions</button>
+</div>
+
+<div class="dashboard-grid fade-in" id="results-stats">
+  <div class="stat-card"><div class="stat-label">Average score</div><div class="stat-value skeleton" style="height:1.75rem;width:3rem"></div></div>
+  <div class="stat-card"><div class="stat-label">Submissions graded</div><div class="stat-value skeleton" style="height:1.75rem;width:3rem"></div></div>
+  <div class="stat-card"><div class="stat-label">Awaiting grading</div><div class="stat-value skeleton" style="height:1.75rem;width:3rem"></div></div>
+</div>
+
+<div class="card fade-in">
+  <div class="card-header"><h2 class="section-title" style="margin:0">Upload marks</h2></div>
+  <div class="card-body">
+    <form id="marks-form" class="form-row">
+      <div class="form-group">
+        <label for="marks-class">Class</label>
+        <select id="marks-class" required><option value="">Select class…</option></select>
+      </div>
+      <div class="form-group">
+        <label for="marks-subject">Subject</label>
+        <select id="marks-subject" required></select>
+      </div>
+      <div class="form-group">
+        <label for="marks-student">Student</label>
+        <select id="marks-student" required disabled><option value="">Select a class first</option></select>
+      </div>
+      <div class="form-group">
+        <label for="marks-value">Marks</label>
+        <input type="number" id="marks-value" min="0" max="100" required />
+      </div>
+      <div class="form-group">
+        <label for="marks-grade">Grade (optional)</label>
+        <input type="text" id="marks-grade" placeholder="e.g. A-" />
+      </div>
+      <div class="form-group" style="align-self:end">
+        <button type="submit" class="btn btn-primary" style="width:100%">Save marks</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card fade-in" style="margin-top:var(--space-8)">
+  <div class="card-header"><h2 class="section-title" style="margin:0">Recently graded</h2></div>
+  <div class="card-body">
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Student</th><th>Assignment</th><th>Marks</th></tr></thead>
+        <tbody id="graded-body"><tr><td colspan="3">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  const { get, post } = await import("../assets/js/api.js");
+  const { escapeHtml } = await import("../assets/js/utils.js");
+  const { toast } = await import("../assets/js/alerts.js");
+
+  try {
+    const submissions = await get("/teacher/submissions");
+    const graded = submissions.filter((s) => s.marks !== null);
+    const avg = graded.length ? Math.round(graded.reduce((sum, s) => sum + Number(s.marks), 0) / graded.length) : null;
+
+    document.getElementById("results-stats").innerHTML = `
+      <div class="stat-card">
+        <div class="stat-label">Average score</div>
+        <div class="stat-value">${avg !== null ? avg + "%" : "—"}</div>
+        <div class="stat-delta">&nbsp;</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Submissions graded</div>
+        <div class="stat-value">${graded.length}</div>
+        <div class="stat-delta">&nbsp;</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Awaiting grading</div>
+        <div class="stat-value">${submissions.length - graded.length}</div>
+        <div class="stat-delta">&nbsp;</div>
+      </div>
+    `;
+
+    document.getElementById("graded-body").innerHTML = graded.length
+      ? graded.slice(0, 10).map((s) => `<tr><td data-label="Student"><strong>${escapeHtml(s.student_name)}</strong></td><td data-label="Assignment">${escapeHtml(s.assignment_title)}</td><td data-label="Marks">${s.marks}</td></tr>`).join("")
+      : `<tr><td colspan="3"><div class="empty-state"><h3>No grades yet</h3><p>Grade a submission to see it here.</p></div></td></tr>`;
+  } catch (err) {
+    document.getElementById("graded-body").innerHTML = `<tr><td colspan="3">${err.message}</td></tr>`;
+  }
+
+  let allStudents = [];
+  const classSelect = document.getElementById("marks-class");
+  const studentSelect = document.getElementById("marks-student");
+
+  function populateStudentsForClass(classId) {
+    const filtered = allStudents.filter((s) => s.class_id === classId);
+    studentSelect.disabled = false;
+    studentSelect.innerHTML = filtered.length
+      ? filtered.map((s) => `<option value="${s.id}">${escapeHtml(s.fullname)}</option>`).join("")
+      : `<option value="">No students in this class</option>`;
+  }
+
+  classSelect.addEventListener("change", () => {
+    if (!classSelect.value) {
+      studentSelect.disabled = true;
+      studentSelect.innerHTML = `<option value="">Select a class first</option>`;
+      return;
+    }
+    populateStudentsForClass(classSelect.value);
+  });
+
+  try {
+    const [students, subjects, classes] = await Promise.all([
+      get("/teacher/students"), get("/teacher/subjects"), get("/teacher/classes"),
+    ]);
+    allStudents = students;
+    document.getElementById("marks-subject").innerHTML = subjects.map((s) => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join("");
+    classSelect.innerHTML = `<option value="">Select class…</option>` + classes.map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join("");
+  } catch (err) {
+    toast(err.message || "Failed to load students/subjects", "error");
+  }
+
+  document.getElementById("marks-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (!studentSelect.value) return toast("Select a student", "error");
+    try {
+      await post("/teacher/upload-marks", {
+        student_id: studentSelect.value,
+        subject_id: document.getElementById("marks-subject").value,
+        marks: Number(document.getElementById("marks-value").value),
+        grade: document.getElementById("marks-grade").value.trim() || null,
+      });
+      toast("Marks saved", "success");
+      e.target.reset();
+      studentSelect.disabled = true;
+      studentSelect.innerHTML = `<option value="">Select a class first</option>`;
+    } catch (err) {
+      toast(err.message || "Failed to save marks", "error");
+    }
+  });
+</script>

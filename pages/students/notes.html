@@ -1,0 +1,89 @@
+<div class="page-header fade-in">
+  <div>
+    <h1>My Notes</h1>
+    <p>Notes uploaded by your teachers, organized by subject.</p>
+  </div>
+</div>
+
+<div class="card fade-in">
+  <div class="card-header">
+    <div class="search-box" style="width:320px">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="search" id="notes-search" placeholder="Search notes..." />
+    </div>
+    <select id="notes-filter">
+      <option value="">All subjects</option>
+    </select>
+  </div>
+  <div class="card-body">
+    <div class="notes-grid" id="notes-list">
+      <div class="empty-state"><p>Loading notes…</p></div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .notes-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: var(--space-5); }
+  .note-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--space-5); transition: box-shadow 0.2s, transform 0.15s; }
+  .note-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+  .note-header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-2); }
+  .note-header h3 { font-size: 1.0625rem; margin: 0; }
+  .note-meta { font-size: 0.8125rem; color: var(--foreground-muted); margin-bottom: var(--space-3); }
+  .note-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-4); }
+  .note-actions .btn { padding: var(--space-2) var(--space-3); font-size: 0.8125rem; }
+</style>
+
+<script type="module">
+  const { get } = await import("../assets/js/api.js");
+  const { escapeHtml, formatRelative, openViewer, downloadFile } = await import("../assets/js/utils.js");
+
+  const listEl = document.getElementById("notes-list");
+  const searchEl = document.getElementById("notes-search");
+  const filterEl = document.getElementById("notes-filter");
+  let allNotes = [];
+
+  function render() {
+    const q = searchEl.value.trim().toLowerCase();
+    const subject = filterEl.value;
+    const filtered = allNotes.filter((n) => {
+      const matchesQ = !q || n.title.toLowerCase().includes(q);
+      const matchesSubject = !subject || n.subject_name === subject;
+      return matchesQ && matchesSubject;
+    });
+
+    listEl.innerHTML = filtered.length
+      ? filtered.map((n) => `
+        <article class="note-card">
+          <div class="note-header">
+            <h3>${escapeHtml(n.title)}</h3>
+            ${n.subject_name ? `<span class="badge">${escapeHtml(n.subject_name)}</span>` : ""}
+          </div>
+          <p class="note-meta">Uploaded ${formatRelative(n.created_at)}</p>
+          <div class="note-actions">
+            <button class="btn btn-primary open-btn" data-title="${escapeHtml(n.title)}" data-url="${escapeHtml(n.file_url)}">Open note</button>
+            <button class="btn btn-ghost download-btn" data-title="${escapeHtml(n.title)}" data-url="${escapeHtml(n.file_url)}">Download</button>
+          </div>
+        </article>
+      `).join("")
+      : `<div class="empty-state"><h3>No notes yet</h3><p>Your teachers haven't uploaded any notes here yet.</p></div>`;
+
+    listEl.querySelectorAll(".open-btn").forEach((btn) => {
+      btn.addEventListener("click", () => openViewer(btn.dataset.url, btn.dataset.title));
+    });
+    listEl.querySelectorAll(".download-btn").forEach((btn) => {
+      btn.addEventListener("click", () => downloadFile(btn.dataset.url, btn.dataset.title));
+    });
+  }
+
+  try {
+    allNotes = await get("/student/notes");
+    const subjects = [...new Set(allNotes.map((n) => n.subject_name).filter(Boolean))];
+    filterEl.innerHTML = `<option value="">All subjects</option>` + subjects.map((s) => `<option>${escapeHtml(s)}</option>`).join("");
+    render();
+  } catch (err) {
+    listEl.innerHTML = `<div class="empty-state"><h3>Couldn't load notes</h3><p>${err.message}</p></div>`;
+  }
+
+  searchEl.addEventListener("input", render);
+  filterEl.addEventListener("change", render);
+</script>

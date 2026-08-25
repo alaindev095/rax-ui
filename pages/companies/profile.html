@@ -1,0 +1,372 @@
+<div class="page-header fade-in">
+  <div>
+    <h1>Company Profile</h1>
+    <p>This is exactly how students and school admins see your company.</p>
+  </div>
+  <button class="btn btn-primary" id="edit-toggle-btn" style="display:none">Edit profile</button>
+</div>
+
+<div id="view-root" class="fade-in"></div>
+
+<div class="card fade-in" id="edit-card" style="display:none">
+  <div class="card-header">
+    <h2 class="section-title" style="margin:0">Edit profile</h2>
+    <button type="button" class="btn btn-ghost btn-sm" id="cancel-edit-btn">Cancel</button>
+  </div>
+  <div class="card-body">
+    <div class="profile-logo-row">
+      <div class="profile-logo" id="logo-preview">?</div>
+      <div>
+        <button type="button" class="btn btn-ghost btn-sm" id="logo-upload-btn">Change logo</button>
+        <input type="file" id="logo-input" accept="image/*" style="display:none" />
+        <p style="font-size:0.75rem;color:var(--foreground-muted);margin:var(--space-1) 0 0">PNG or JPG, square works best.</p>
+      </div>
+    </div>
+
+    <form id="profile-form" class="form-row" style="margin-top:var(--space-6)">
+      <div class="form-group"><label for="f-name">Company name</label><input type="text" id="f-name" required /></div>
+      <div class="form-group"><label for="f-email">Email</label><input type="email" id="f-email" /></div>
+      <div class="form-group"><label for="f-phone">Phone</label><input type="text" id="f-phone" /></div>
+      <div class="form-group"><label for="f-website">Website</label><input type="text" id="f-website" placeholder="https://" /></div>
+      <div class="form-group"><label for="f-district">District</label><input type="text" id="f-district" /></div>
+      <div class="form-group"><label for="f-province">Province</label><input type="text" id="f-province" /></div>
+      <div class="form-group"><label for="f-industry">Industry</label><input type="text" id="f-industry" placeholder="e.g. Software, Manufacturing" /></div>
+      <div class="form-group"><label for="f-employees">Employee count</label><input type="text" id="f-employees" placeholder="e.g. 11-50" /></div>
+      <div class="form-group"><label for="f-founded">Founded year</label><input type="number" id="f-founded" min="1900" max="2100" /></div>
+      <div class="form-group" style="grid-column:1/-1"><label for="f-address">Address</label><input type="text" id="f-address" /></div>
+      <div class="form-group" style="grid-column:1/-1"><label for="f-description">Description</label><textarea id="f-description" rows="4" placeholder="Tell students what your company does and what makes it a great place to intern."></textarea></div>
+
+      <div class="form-group" style="grid-column:1/-1">
+        <label>Trades you offer internships in</label>
+        <div class="trade-checks" id="trade-checks">Loading trades…</div>
+      </div>
+
+      <div class="form-group" style="grid-column:1/-1">
+        <label>Photo gallery <span style="font-weight:400;color:var(--foreground-muted)">(up to 3 images)</span></label>
+        <div class="gallery-strip" id="gallery-strip"></div>
+        <button type="button" class="btn btn-ghost btn-sm" id="gallery-upload-btn" style="margin-top:var(--space-2)">Add photo</button>
+        <input type="file" id="gallery-input" accept="image/*" style="display:none" />
+      </div>
+
+      <div class="form-group"><button type="submit" class="btn btn-primary" id="save-btn">Save changes</button></div>
+    </form>
+  </div>
+</div>
+
+<div class="card fade-in" style="margin-top:var(--space-6)">
+  <div class="card-header">
+    <div>
+      <h2 class="section-title" style="margin:0">Staff accounts</h2>
+      <p style="margin:2px 0 0;font-size:0.8125rem;color:var(--foreground-muted)">Up to 2 people can log in and manage this company, so work continues if one of you is unavailable.</p>
+    </div>
+    <button class="btn btn-accent btn-sm" id="invite-staff-btn">Add staff member</button>
+  </div>
+  <div class="card-body">
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Name</th><th>Email</th><th>Joined</th><th></th></tr></thead>
+        <tbody id="staff-body"><tr><td colspan="4">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="card fade-in" id="invite-card" style="display:none;margin-top:var(--space-6)">
+  <div class="card-header"><h2 class="section-title" style="margin:0">Invite staff member</h2></div>
+  <div class="card-body">
+    <form id="invite-form" class="inline-form">
+      <div class="form-group"><label for="s-name">Full name</label><input type="text" id="s-name" required /></div>
+      <div class="form-group"><label for="s-email">Email</label><input type="email" id="s-email" required /></div>
+      <button type="submit" class="btn btn-primary" id="invite-submit">Send invite</button>
+    </form>
+    <p style="font-size:0.8125rem;color:var(--foreground-muted);margin:var(--space-3) 0 0">A secure temporary password will be generated automatically and emailed to them.</p>
+  </div>
+</div>
+
+<style>
+  .btn-sm { padding: var(--space-2) var(--space-4); font-size: 0.875rem; }
+  .inline-form { display: flex; gap: var(--space-3); align-items: flex-end; flex-wrap: wrap; }
+  .profile-logo-row { display: flex; align-items: center; gap: var(--space-4); }
+  .profile-logo, .detail-logo { width: 4rem; height: 4rem; border-radius: var(--radius); background: var(--primary); color: var(--primary-foreground); display: grid; place-items: center; font-weight: 700; font-size: 1.5rem; overflow: hidden; flex-shrink: 0; }
+  .profile-logo img, .detail-logo img { width: 100%; height: 100%; object-fit: cover; }
+  .trade-checks { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+  .trade-check { display: flex; align-items: center; gap: 6px; font-size: 0.8125rem; background: var(--surface); border-radius: 999px; padding: 6px 12px; }
+  .trade-check input { width: auto; }
+  .gallery-strip { display: flex; gap: var(--space-3); flex-wrap: wrap; }
+  .gallery-thumb { position: relative; width: 110px; height: 90px; border-radius: var(--radius); overflow: hidden; background: var(--surface); }
+  .gallery-thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .gallery-thumb .remove-thumb { position: absolute; top: 2px; right: 2px; width: 22px; height: 22px; border-radius: 50%; border: none; background: rgba(0,0,0,0.6); color: #fff; cursor: pointer; line-height: 1; font-size: 0.875rem; }
+  .verified-badge { display: inline-flex; align-items: center; gap: 3px; color: var(--info); font-size: 0.75rem; font-weight: 700; }
+  .detail-header { display: flex; gap: var(--space-4); align-items: flex-start; margin-bottom: var(--space-5); }
+  .detail-title { font-size: 1.5rem; margin: 4px 0; }
+  .detail-section { margin-bottom: var(--space-5); }
+  .detail-section h3 { font-size: 1rem; margin-bottom: var(--space-2); }
+  .detail-section p { color: var(--foreground-muted); white-space: pre-wrap; line-height: 1.6; }
+  .detail-facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--space-4); }
+  .detail-fact { background: var(--surface); border-radius: var(--radius); padding: var(--space-3) var(--space-4); }
+  .detail-fact span { display: block; font-size: 0.75rem; color: var(--foreground-muted); text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 2px; }
+  .detail-fact strong { font-size: 1rem; }
+  .contact-row { display: flex; gap: var(--space-2); font-size: 0.875rem; align-items: center; color: var(--foreground-muted); }
+</style>
+
+<script type="module">
+  const { get, post, del, patchForm } = await import("../assets/js/api.js");
+  const { toast, confirmDialog } = await import("../assets/js/alerts.js");
+  const { escapeHtml } = await import("../assets/js/utils.js");
+  const { formatDate } = await import("../assets/js/utils.js");
+  const { internshipInitials } = await import("../assets/js/internships.js");
+  const { getUser } = await import("../assets/js/auth.js");
+
+  const me = getUser();
+  const viewRoot = document.getElementById("view-root");
+  const editCard = document.getElementById("edit-card");
+  const editToggleBtn = document.getElementById("edit-toggle-btn");
+  const cancelEditBtn = document.getElementById("cancel-edit-btn");
+
+  let company;
+  let allTrades = [];
+
+  // --- Read-only "profile card" — the same layout students and school
+  // admins see when they view this company, so what's shown here on the
+  // dashboard is a true preview, not a different-looking form. ------------
+  function renderView() {
+    viewRoot.innerHTML = `
+      <div class="card">
+        <div class="card-body">
+          <div class="detail-header">
+            <div class="detail-logo">${company.logo_url ? `<img src="${escapeHtml(company.logo_url)}" alt="" />` : internshipInitials(company.name)}</div>
+            <div>
+              <div>${company.verified
+                ? `<span class="verified-badge"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Verified company</span>`
+                : `<span class="badge badge-warning">Unverified — a super-admin will review your profile</span>`}
+              </div>
+              <h1 class="detail-title">${escapeHtml(company.name || "Your company")}</h1>
+              ${company.trades && company.trades.length ? company.trades.map((t) => `<span class="badge badge-info" style="margin-right:4px">${escapeHtml(t.name)}</span>`).join("") : ""}
+            </div>
+          </div>
+
+          ${company.gallery_images && company.gallery_images.length ? `<div class="detail-section"><h3>Gallery</h3><div class="gallery-strip">${company.gallery_images.map((url) => `<div class="gallery-thumb"><img src="${escapeHtml(url)}" alt="" /></div>`).join("")}</div></div>` : ""}
+
+          <div class="detail-section">
+            <h3>About ${escapeHtml(company.name || "your company")}</h3>
+            <p>${escapeHtml(company.description || "No description provided yet — students see this section blank. Click \"Edit profile\" to add one.")}</p>
+          </div>
+
+          <div class="detail-section">
+            <h3>Company facts</h3>
+            <div class="detail-facts">
+              <div class="detail-fact"><span>Location</span><strong>${escapeHtml(company.district || "—")}${company.province ? ", " + escapeHtml(company.province) : ""}</strong></div>
+              <div class="detail-fact"><span>Industry</span><strong>${escapeHtml(company.industry || "—")}</strong></div>
+              <div class="detail-fact"><span>Employees</span><strong>${escapeHtml(company.employee_count || "—")}</strong></div>
+              <div class="detail-fact"><span>Founded</span><strong>${company.founded_year || "—"}</strong></div>
+            </div>
+          </div>
+
+          <div class="detail-section" style="margin-bottom:0">
+            <h3>Contact</h3>
+            ${company.address ? `<div class="contact-row">📍 ${escapeHtml(company.address)}</div>` : ""}
+            ${company.phone ? `<div class="contact-row">📞 ${escapeHtml(company.phone)}</div>` : ""}
+            ${company.email ? `<div class="contact-row">✉️ ${escapeHtml(company.email)}</div>` : ""}
+            ${company.website ? `<div class="contact-row">🔗 ${escapeHtml(company.website)}</div>` : ""}
+            ${!company.address && !company.phone && !company.email && !company.website ? `<p style="color:var(--foreground-muted);font-size:0.875rem;margin:0">No contact details added yet.</p>` : ""}
+          </div>
+        </div>
+      </div>`;
+  }
+
+  // --- Edit form population ------------------------------------------------
+  const logoPreview = document.getElementById("logo-preview");
+  const logoInput = document.getElementById("logo-input");
+  let pendingLogoFile = null;
+  document.getElementById("logo-upload-btn").addEventListener("click", () => logoInput.click());
+  logoInput.addEventListener("change", () => {
+    if (!logoInput.files.length) return;
+    pendingLogoFile = logoInput.files[0];
+    logoPreview.innerHTML = `<img src="${URL.createObjectURL(pendingLogoFile)}" alt="" />`;
+  });
+
+  let existingGallery = [];
+  let removedGallery = [];
+  let pendingGalleryFiles = [];
+  const galleryStrip = document.getElementById("gallery-strip");
+  const galleryInput = document.getElementById("gallery-input");
+
+  function renderGallery() {
+    const remaining = existingGallery.filter((url) => !removedGallery.includes(url));
+    const total = remaining.length + pendingGalleryFiles.length;
+    galleryStrip.innerHTML =
+      remaining.map((url) => `<div class="gallery-thumb"><img src="${escapeHtml(url)}" alt="" /><button type="button" class="remove-thumb" data-existing="${escapeHtml(url)}">&times;</button></div>`).join("") +
+      pendingGalleryFiles.map((f, idx) => `<div class="gallery-thumb"><img src="${URL.createObjectURL(f)}" alt="" /><button type="button" class="remove-thumb" data-pending="${idx}">&times;</button></div>`).join("");
+    document.getElementById("gallery-upload-btn").disabled = total >= 3;
+    galleryStrip.querySelectorAll("[data-existing]").forEach((btn) => btn.addEventListener("click", () => {
+      removedGallery.push(btn.dataset.existing);
+      renderGallery();
+    }));
+    galleryStrip.querySelectorAll("[data-pending]").forEach((btn) => btn.addEventListener("click", () => {
+      pendingGalleryFiles.splice(Number(btn.dataset.pending), 1);
+      renderGallery();
+    }));
+  }
+  document.getElementById("gallery-upload-btn").addEventListener("click", () => galleryInput.click());
+  galleryInput.addEventListener("change", () => {
+    const remaining = existingGallery.filter((url) => !removedGallery.includes(url)).length + pendingGalleryFiles.length;
+    const slots = Math.max(0, 3 - remaining);
+    pendingGalleryFiles.push(...Array.from(galleryInput.files).slice(0, slots));
+    galleryInput.value = "";
+    renderGallery();
+  });
+
+  function populateEditForm() {
+    logoPreview.innerHTML = company.logo_url ? `<img src="${escapeHtml(company.logo_url)}" alt="" />` : internshipInitials(company.name);
+    document.getElementById("f-name").value = company.name || "";
+    document.getElementById("f-email").value = company.email || "";
+    document.getElementById("f-phone").value = company.phone || "";
+    document.getElementById("f-website").value = company.website || "";
+    document.getElementById("f-district").value = company.district || "";
+    document.getElementById("f-province").value = company.province || "";
+    document.getElementById("f-industry").value = company.industry || "";
+    document.getElementById("f-employees").value = company.employee_count || "";
+    document.getElementById("f-founded").value = company.founded_year || "";
+    document.getElementById("f-address").value = company.address || "";
+    document.getElementById("f-description").value = company.description || "";
+
+    const myTradeIds = new Set((company.trades || []).map((t) => t.id));
+    document.getElementById("trade-checks").innerHTML = allTrades.length
+      ? allTrades.map((t) => `<label class="trade-check"><input type="checkbox" value="${t.id}" ${myTradeIds.has(t.id) ? "checked" : ""} /> ${escapeHtml(t.name)}</label>`).join("")
+      : `<span style="color:var(--foreground-muted);font-size:0.8125rem">No trades configured yet.</span>`;
+
+    existingGallery = company.gallery_images || [];
+    removedGallery = [];
+    pendingGalleryFiles = [];
+    pendingLogoFile = null;
+    renderGallery();
+  }
+
+  function showEdit() {
+    viewRoot.style.display = "none";
+    editToggleBtn.style.display = "none";
+    editCard.style.display = "block";
+    populateEditForm();
+  }
+  function showView() {
+    viewRoot.style.display = "block";
+    editToggleBtn.style.display = "inline-flex";
+    editCard.style.display = "none";
+    renderView();
+  }
+
+  editToggleBtn.addEventListener("click", showEdit);
+  cancelEditBtn.addEventListener("click", showView);
+
+  try {
+    const [companyData, trades] = await Promise.all([get("/company/profile"), get("/company/trades")]);
+    company = companyData;
+    allTrades = trades;
+    showView();
+  } catch (err) {
+    viewRoot.innerHTML = `<div class="empty-state"><h3>Couldn't load profile</h3><p>${err.message}</p></div>`;
+  }
+
+  document.getElementById("profile-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById("save-btn");
+    btn.disabled = true;
+    btn.textContent = "Saving…";
+    try {
+      const fd = new FormData();
+      fd.append("name", document.getElementById("f-name").value.trim());
+      fd.append("email", document.getElementById("f-email").value.trim());
+      fd.append("phone", document.getElementById("f-phone").value.trim());
+      fd.append("website", document.getElementById("f-website").value.trim());
+      fd.append("district", document.getElementById("f-district").value.trim());
+      fd.append("province", document.getElementById("f-province").value.trim());
+      fd.append("industry", document.getElementById("f-industry").value.trim());
+      fd.append("employee_count", document.getElementById("f-employees").value.trim());
+      fd.append("founded_year", document.getElementById("f-founded").value || "");
+      fd.append("address", document.getElementById("f-address").value.trim());
+      fd.append("description", document.getElementById("f-description").value.trim());
+      const tradeIds = Array.from(document.querySelectorAll("#trade-checks input:checked")).map((el) => el.value);
+      fd.append("trade_ids", JSON.stringify(tradeIds));
+      if (removedGallery.length) fd.append("remove_gallery", JSON.stringify(removedGallery));
+      pendingGalleryFiles.forEach((f) => fd.append("gallery", f));
+      if (pendingLogoFile) fd.append("logo", pendingLogoFile);
+      await patchForm("/company/profile", fd);
+      toast("Profile updated", "success");
+      company = await get("/company/profile");
+      showView();
+    } catch (err) {
+      toast(err.message || "Update failed", "error");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Save changes";
+    }
+  });
+
+  // --- Staff accounts --------------------------------------------------
+  const staffBody = document.getElementById("staff-body");
+  const inviteCard = document.getElementById("invite-card");
+  const inviteBtn = document.getElementById("invite-staff-btn");
+
+  async function loadStaff() {
+    try {
+      const staff = await get("/company/staff");
+      staffBody.innerHTML = staff.length
+        ? staff.map((s) => `<tr>
+            <td data-label="Name"><strong>${escapeHtml(s.fullname)}</strong>${s.id === me.id ? ' <span class="badge">You</span>' : ""}</td>
+            <td data-label="Email">${escapeHtml(s.email)}</td>
+            <td data-label="Joined">${formatDate(s.created_at)}</td>
+            <td>${s.id === me.id ? "" : `<button class="btn btn-danger btn-sm remove-staff-btn" data-id="${s.id}">Remove</button>`}</td>
+          </tr>`).join("")
+        : `<tr><td colspan="4"><div class="empty-state"><h3>No staff yet</h3></div></td></tr>`;
+
+      inviteBtn.disabled = staff.length >= 2;
+      inviteBtn.title = staff.length >= 2 ? "This company already has 2 staff accounts" : "";
+
+      staffBody.querySelectorAll(".remove-staff-btn").forEach((btn) => btn.addEventListener("click", () => {
+        confirmDialog({
+          title: "Remove staff member",
+          message: "They will lose access to this company's dashboard. Continue?",
+          confirmText: "Remove",
+          onConfirm: async () => {
+            try {
+              await del(`/company/staff/${btn.dataset.id}`);
+              toast("Staff member removed", "success");
+              loadStaff();
+            } catch (err) {
+              toast(err.message || "Could not remove", "error");
+            }
+          },
+        });
+      }));
+    } catch (err) {
+      staffBody.innerHTML = `<tr><td colspan="4">${err.message}</td></tr>`;
+    }
+  }
+  await loadStaff();
+
+  inviteBtn.addEventListener("click", () => {
+    inviteCard.style.display = inviteCard.style.display === "none" ? "block" : "none";
+  });
+
+  document.getElementById("invite-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById("invite-submit");
+    btn.disabled = true;
+    btn.textContent = "Sending…";
+    try {
+      await post("/company/staff", {
+        fullname: document.getElementById("s-name").value.trim(),
+        email: document.getElementById("s-email").value.trim(),
+      });
+      toast("Staff account created — login details emailed to them", "success");
+      e.target.reset();
+      inviteCard.style.display = "none";
+      loadStaff();
+    } catch (err) {
+      toast(err.message || "Could not invite staff member", "error");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Send invite";
+    }
+  });
+</script>

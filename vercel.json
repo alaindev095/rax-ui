@@ -1,0 +1,10 @@
+{
+  "cleanUrls": true,
+  "trailingSlash": false,
+  "rewrites": [
+    { "source": "/assets/(.*)", "destination": "/assets/$1" },
+    { "source": "/components/(.*)", "destination": "/components/$1" },
+    { "source": "/pages/(.*)", "destination": "/pages/$1" },
+    { "source": "/((?!assets|components|pages).*)", "destination": "/index" }
+  ]
+}

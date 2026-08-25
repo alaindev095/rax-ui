@@ -1,0 +1,132 @@
+<div class="page-header fade-in">
+  <div>
+    <button class="btn btn-ghost btn-sm" id="back-btn">&larr; Back to internships</button>
+    <h1 style="margin-top:var(--space-2)">Interns by school</h1>
+    <p>Filter every approved applicant you've ever received across all your internships, and export it for business decisions.</p>
+  </div>
+</div>
+
+<div class="card fade-in">
+  <div class="card-body">
+    <form id="filter-form" class="form-row" style="align-items:flex-end">
+      <div class="form-group">
+        <label for="f-school">School</label>
+        <select id="f-school"><option value="">All schools</option></select>
+      </div>
+      <div class="form-group">
+        <label for="f-trade">Trade</label>
+        <select id="f-trade"><option value="">All trades</option></select>
+      </div>
+      <div class="form-group">
+        <label for="f-status">Status</label>
+        <select id="f-status">
+          <option value="">Any status</option>
+          <option value="waiting_payment">Waiting payment</option>
+          <option value="payment_confirmed">Payment confirmed</option>
+          <option value="under_company_review">Under review</option>
+          <option value="accepted">Accepted</option>
+          <option value="rejected">Rejected</option>
+        </select>
+      </div>
+      <div class="form-group" style="flex:0">
+        <button type="submit" class="btn btn-primary" id="apply-btn">Apply filters</button>
+      </div>
+      <div class="form-group" style="flex:0">
+        <button type="button" class="btn btn-ghost" id="export-btn">Export to Excel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card fade-in" style="margin-top:var(--space-6)">
+  <div class="card-header"><h2 class="section-title" style="margin:0" id="result-count">Results</h2></div>
+  <div class="card-body">
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Student</th><th>School</th><th>Trade</th><th>Internship</th><th>Status</th><th>Applied</th></tr></thead>
+        <tbody id="report-body"><tr><td colspan="6">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<style>
+  .btn-sm { padding: var(--space-2) var(--space-4); font-size: 0.875rem; }
+</style>
+
+<script type="module">
+  const { get, getBlob, downloadBlob } = await import("../assets/js/api.js");
+  const { escapeHtml, formatDate } = await import("../assets/js/utils.js");
+  const { toast } = await import("../assets/js/alerts.js");
+  const { statusBadge } = await import("../assets/js/internships.js");
+  const { navigate } = await import("../assets/js/router.js");
+
+  document.getElementById("back-btn").addEventListener("click", () => navigate("/companies/internships"));
+
+  const body = document.getElementById("report-body");
+  const schoolSelect = document.getElementById("f-school");
+  const tradeSelect = document.getElementById("f-trade");
+  const statusSelect = document.getElementById("f-status");
+
+  function currentFilters() {
+    const params = {};
+    if (schoolSelect.value) params.school_id = schoolSelect.value;
+    if (tradeSelect.value) params.trade_id = tradeSelect.value;
+    if (statusSelect.value) params.status = statusSelect.value;
+    return params;
+  }
+
+  async function loadReport() {
+    body.innerHTML = `<tr><td colspan="6">Loading…</td></tr>`;
+    try {
+      const params = new URLSearchParams(currentFilters()).toString();
+      const rows = await get(`/company/applicants/report${params ? "?" + params : ""}`);
+      document.getElementById("result-count").textContent = `Results (${rows.length})`;
+      body.innerHTML = rows.length
+        ? rows.map((a) => `<tr>
+            <td data-label="Student"><strong>${escapeHtml(a.student_name)}</strong><br><span style="font-size:0.75rem;color:var(--foreground-muted)">${escapeHtml(a.student_email)}</span></td>
+            <td data-label="School">${escapeHtml(a.school_name || "—")}</td>
+            <td data-label="Trade">${escapeHtml(a.trade_name || "—")}</td>
+            <td data-label="Internship">${escapeHtml(a.internship_title)}${a.internship_deleted ? ` <span class="badge">Deleted</span>` : ""}</td>
+            <td data-label="Status">${statusBadge(a.status)}</td>
+            <td data-label="Applied">${formatDate(a.applied_at)}</td>
+          </tr>`).join("")
+        : `<tr><td colspan="6"><div class="empty-state"><h3>No results</h3><p>Try different filters.</p></div></td></tr>`;
+    } catch (err) {
+      body.innerHTML = `<tr><td colspan="6">${err.message}</td></tr>`;
+    }
+  }
+
+  document.getElementById("filter-form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    loadReport();
+  });
+
+  document.getElementById("export-btn").addEventListener("click", async () => {
+    const btn = document.getElementById("export-btn");
+    btn.disabled = true;
+    btn.textContent = "Exporting…";
+    try {
+      const params = new URLSearchParams(currentFilters()).toString();
+      const blob = await getBlob(`/company/applicants/report/export${params ? "?" + params : ""}`);
+      downloadBlob(blob, "interns-by-school.xlsx");
+    } catch (err) {
+      toast(err.message || "Export failed", "error");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Export to Excel";
+    }
+  });
+
+  try {
+    const schools = await get("/company/applicants/schools");
+    schoolSelect.innerHTML = `<option value="">All schools</option>` + schools.map((s) => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join("");
+  } catch { /* non-fatal */ }
+
+  try {
+    const trades = await get("/company/trades");
+    tradeSelect.innerHTML = `<option value="">All trades</option>` + trades.map((t) => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join("");
+  } catch { /* non-fatal */ }
+
+  await loadReport();
+</script>

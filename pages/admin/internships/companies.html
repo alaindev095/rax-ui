@@ -1,0 +1,73 @@
+<div class="page-header fade-in">
+  <div>
+    <h1>Companies</h1>
+    <p>Browse internship companies. Verification is managed by the Umunara super-admin team.</p>
+  </div>
+  <button class="btn btn-ghost" data-nav="/admin/internships">Internship administration</button>
+</div>
+
+<div class="company-grid fade-in" id="companies-grid">
+  <div class="empty-state"><h3>Loading…</h3></div>
+</div>
+
+<div id="detail-modal"></div>
+
+<style id="company-card-styles"></style>
+<style>
+  .btn-sm { padding: var(--space-2) var(--space-4); font-size: 0.875rem; }
+  .company-detail-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; padding: var(--space-5); z-index: 100; }
+  .company-detail-panel { background: var(--background); border-radius: var(--radius); max-width: 560px; width: 100%; max-height: 85vh; overflow-y: auto; }
+  .company-detail-panel .card-body { display: flex; flex-direction: column; gap: var(--space-3); }
+</style>
+
+<script type="module">
+  const { get } = await import("../../assets/js/api.js");
+  const { escapeHtml } = await import("../../assets/js/utils.js");
+  const { companyCardHtml, companyCardStyles } = await import("../../assets/js/company-card.js");
+
+  document.getElementById("company-card-styles").textContent = companyCardStyles;
+
+  const grid = document.getElementById("companies-grid");
+  const modalRoot = document.getElementById("detail-modal");
+
+  function showDetail(c) {
+    modalRoot.innerHTML = `
+      <div class="company-detail-backdrop">
+        <div class="card company-detail-panel">
+          <div class="card-header" style="display:flex;align-items:center">
+            <h2 class="section-title" style="margin:0">${escapeHtml(c.name)}</h2>
+            <button class="btn btn-ghost btn-sm company-detail-close" style="margin-left:auto">Close</button>
+          </div>
+          <div class="card-body">
+            <p>${c.description ? escapeHtml(c.description) : "No description provided."}</p>
+            <p><strong>Location:</strong> ${escapeHtml(c.address || c.district || "—")}${c.province ? ", " + escapeHtml(c.province) : ""}</p>
+            <p><strong>Contact:</strong> ${escapeHtml(c.email || "—")} ${c.phone ? "· " + escapeHtml(c.phone) : ""}</p>
+            <p><strong>Website:</strong> ${c.website ? escapeHtml(c.website) : "—"}</p>
+            <p><strong>Trades:</strong> ${c.trades && c.trades.length ? c.trades.map((t) => escapeHtml(t.name)).join(", ") : "—"}</p>
+            <p><strong>Internships published:</strong> ${c.internships_count}</p>
+            <p><strong>Status:</strong> ${c.verified ? '<span class="badge badge-success">Verified</span>' : '<span class="badge badge-warning">Unverified</span>'}</p>
+          </div>
+        </div>
+      </div>`;
+    modalRoot.querySelector(".company-detail-close").addEventListener("click", () => { modalRoot.innerHTML = ""; });
+    modalRoot.querySelector(".company-detail-backdrop").addEventListener("click", (e) => { if (e.target === e.currentTarget) modalRoot.innerHTML = ""; });
+  }
+
+  async function load() {
+    try {
+      const companies = await get("/admin/companies");
+      grid.innerHTML = companies.length
+        ? companies.map((c) => companyCardHtml(c)).join("")
+        : `<div class="empty-state" style="grid-column:1/-1"><h3>No companies yet</h3></div>`;
+
+      grid.querySelectorAll(".details-btn").forEach((btn) => btn.addEventListener("click", () => {
+        const c = companies.find((x) => x.id === btn.dataset.id);
+        if (c) showDetail(c);
+      }));
+    } catch (err) {
+      grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><h3>Couldn't load companies</h3><p>${err.message}</p></div>`;
+    }
+  }
+
+  await load();
+</script>

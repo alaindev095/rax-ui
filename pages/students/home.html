@@ -1,0 +1,122 @@
+<div class="page-header fade-in">
+  <div>
+    <h1>Welcome back<span id="student-name"></span></h1>
+    <p>Here's what's happening across your notes, assignments, and results.</p>
+  </div>
+  <button class="btn btn-accent" data-nav="/students/ai">Ask the AI tutor</button>
+</div>
+
+<div class="dashboard-grid fade-in" id="student-stats">
+  <div class="stat-card"><div class="stat-label">Notes available</div><div class="stat-value skeleton" style="height:1.75rem;width:3rem"></div></div>
+  <div class="stat-card"><div class="stat-label">Assignments pending</div><div class="stat-value skeleton" style="height:1.75rem;width:3rem"></div></div>
+  <div class="stat-card"><div class="stat-label">Average score</div><div class="stat-value skeleton" style="height:1.75rem;width:3rem"></div></div>
+  <div class="stat-card"><div class="stat-label">Open internships</div><div class="stat-value skeleton" style="height:1.75rem;width:3rem"></div></div>
+</div>
+
+<div class="card fade-in" style="margin-top:var(--space-8)">
+  <div class="card-header">
+    <h2 class="section-title" style="margin:0">Internships for you</h2>
+    <button class="btn btn-ghost" data-nav="/students/internships">Browse all</button>
+  </div>
+  <div class="card-body" id="recent-internships">
+    <div class="empty-state"><p>Loading…</p></div>
+  </div>
+</div>
+
+<div class="card fade-in">
+  <div class="card-header">
+    <h2 class="section-title" style="margin:0">Recent notes</h2>
+    <button class="btn btn-ghost" data-nav="/students/notes">View all</button>
+  </div>
+  <div class="card-body" id="recent-notes">
+    <div class="empty-state"><p>Loading…</p></div>
+  </div>
+</div>
+
+<div class="card fade-in" style="margin-top:var(--space-8)">
+  <div class="card-header">
+    <h2 class="section-title" style="margin:0">Upcoming assignments</h2>
+    <button class="btn btn-ghost" data-nav="/students/assignments">View all</button>
+  </div>
+  <div class="card-body" id="recent-assignments">
+    <div class="empty-state"><p>Loading…</p></div>
+  </div>
+</div>
+
+<script type="module">
+  const { get } = await import("../assets/js/api.js");
+  const { getUser } = await import("../assets/js/auth.js");
+  const { escapeHtml, formatDate } = await import("../assets/js/utils.js");
+
+  const user = getUser();
+  document.getElementById("student-name").textContent = user ? `, ${user.fullname.split(" ")[0]}` : "";
+
+  try {
+    const [notes, assignments, results, internships] = await Promise.all([
+      get("/student/notes"),
+      get("/student/assignments"),
+      get("/student/results"),
+      get("/student/internships").catch(() => []),
+    ]);
+
+    const pending = assignments.filter((a) => !a.submission_id).length;
+    const avg = results.length
+      ? Math.round(results.reduce((s, r) => s + Number(r.marks), 0) / results.length)
+      : null;
+
+    document.getElementById("student-stats").innerHTML = `
+      <div class="stat-card">
+        <div class="stat-label">Notes available</div>
+        <div class="stat-value">${notes.length}</div>
+        <div class="stat-delta">Uploaded by your teachers</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Assignments pending</div>
+        <div class="stat-value">${pending}</div>
+        <div class="stat-delta">${assignments.length} total</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Average score</div>
+        <div class="stat-value">${avg !== null ? avg + "%" : "—"}</div>
+        <div class="stat-delta">${results.length} subject${results.length === 1 ? "" : "s"} graded</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Open internships</div>
+        <div class="stat-value">${internships.length}</div>
+        <div class="stat-delta">From verified &amp; unverified companies</div>
+      </div>
+    `;
+
+    const { navigate } = await import("../assets/js/router.js");
+    const topInternships = internships.slice(0, 5);
+    document.getElementById("recent-internships").innerHTML = topInternships.length
+      ? `<table><thead><tr><th>Title</th><th>Company</th><th>Trade</th><th>Deadline</th></tr></thead><tbody>
+          ${topInternships.map((i) => `<tr class="clickable-row" data-id="${i.id}"><td data-label="Title"><strong>${escapeHtml(i.title)}</strong></td><td data-label="Company">${escapeHtml(i.company_name)}</td><td data-label="Trade">${escapeHtml(i.trade_name || "Any")}</td><td data-label="Deadline">${i.deadline ? formatDate(i.deadline) : "No deadline"}</td></tr>`).join("")}
+        </tbody></table>`
+      : `<div class="empty-state"><h3>No open internships right now</h3><p>Check back soon — companies publish new internships regularly.</p></div>`;
+    document.getElementById("recent-internships").querySelectorAll(".clickable-row").forEach((row) => {
+      row.style.cursor = "pointer";
+      row.addEventListener("click", () => {
+        sessionStorage.setItem("umunara_internship_id", row.dataset.id);
+        navigate("/students/internships/detail");
+      });
+    });
+
+    const recentNotes = notes.slice(0, 5);
+    document.getElementById("recent-notes").innerHTML = recentNotes.length
+      ? `<table><thead><tr><th>Title</th><th>Subject</th><th>Uploaded</th></tr></thead><tbody>
+          ${recentNotes.map((n) => `<tr><td data-label="Title"><strong>${escapeHtml(n.title)}</strong></td><td data-label="Subject">${escapeHtml(n.subject_name || "General")}</td><td data-label="Uploaded">${formatDate(n.created_at)}</td></tr>`).join("")}
+        </tbody></table>`
+      : `<div class="empty-state"><h3>No notes yet</h3><p>Your teachers haven't uploaded any notes yet.</p></div>`;
+
+    const upcoming = assignments.filter((a) => !a.submission_id).slice(0, 5);
+    document.getElementById("recent-assignments").innerHTML = upcoming.length
+      ? `<table><thead><tr><th>Title</th><th>Subject</th><th>Due</th></tr></thead><tbody>
+          ${upcoming.map((a) => `<tr><td data-label="Title"><strong>${escapeHtml(a.title)}</strong></td><td data-label="Subject">${escapeHtml(a.subject_name || "General")}</td><td data-label="Due">${a.deadline ? formatDate(a.deadline) : "No deadline"}</td></tr>`).join("")}
+        </tbody></table>`
+      : `<div class="empty-state"><h3>All caught up</h3><p>No pending assignments right now.</p></div>`;
+  } catch (err) {
+    const { toast } = await import("../assets/js/alerts.js");
+    toast(err.message || "Failed to load dashboard", "error");
+  }
+</script>

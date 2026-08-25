@@ -1,0 +1,134 @@
+<div class="page-header fade-in">
+  <div>
+    <h1>Trades</h1>
+    <p>TVET trades / programmes used across every school's internship module. Only the Umunara super-admin team can add or remove one.</p>
+  </div>
+</div>
+
+<div class="card fade-in">
+  <div class="card-header"><h2 class="section-title" style="margin:0">Add a trade</h2></div>
+  <div class="card-body">
+    <form id="trade-form" class="inline-form">
+      <div class="form-group" style="margin-bottom:0;flex:1">
+        <label for="trade-name" class="sr-only">Trade name</label>
+        <input type="text" id="trade-name" placeholder="e.g. Software Development" required />
+      </div>
+      <button type="submit" class="btn btn-primary" id="trade-submit">Add trade</button>
+    </form>
+  </div>
+</div>
+
+<div class="card fade-in" style="margin-top:var(--space-6)">
+  <div class="card-header"><h2 class="section-title" style="margin:0">All trades</h2></div>
+  <div class="card-body">
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Name</th><th></th></tr></thead>
+        <tbody id="trades-body"><tr><td colspan="2">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div id="delete-modal"></div>
+
+<style>
+  .btn-sm { padding: var(--space-2) var(--space-4); font-size: 0.875rem; }
+  .confirm-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; padding: var(--space-5); z-index: 100; }
+  .confirm-panel { background: var(--background); border-radius: var(--radius); max-width: 440px; width: 100%; }
+  .confirm-panel .card-body { display: flex; flex-direction: column; gap: var(--space-3); }
+</style>
+
+<script type="module">
+  const { get, post, delBody } = await import("../assets/js/api.js");
+  const { escapeHtml } = await import("../assets/js/utils.js");
+  const { toast } = await import("../assets/js/alerts.js");
+
+  const tradesBody = document.getElementById("trades-body");
+  const modalRoot = document.getElementById("delete-modal");
+  let trades = [];
+
+  function renderTrades() {
+    tradesBody.innerHTML = trades.length
+      ? trades.map((t) => `
+        <tr data-id="${t.id}">
+          <td data-label="Name">${escapeHtml(t.name)}</td>
+          <td><button class="btn btn-danger btn-sm trade-delete-btn" data-id="${t.id}" data-name="${escapeHtml(t.name)}">Delete</button></td>
+        </tr>`).join("")
+      : `<tr><td colspan="2"><div class="empty-state"><h3>No trades yet</h3><p>Add your first trade above.</p></div></td></tr>`;
+
+    tradesBody.querySelectorAll(".trade-delete-btn").forEach((btn) => {
+      btn.addEventListener("click", () => openDeleteConfirm(btn.dataset.id, btn.dataset.name));
+    });
+  }
+
+  // Deleting a trade is permanent — require the exact trade name to be
+  // re-typed (paste disabled) before the Delete button is enabled at all.
+  function openDeleteConfirm(id, name) {
+    modalRoot.innerHTML = `
+      <div class="confirm-backdrop">
+        <div class="card confirm-panel">
+          <div class="card-header"><h2 class="section-title" style="margin:0">Delete trade</h2></div>
+          <div class="card-body">
+            <p>This cannot be undone. Type <strong>${escapeHtml(name)}</strong> below to confirm.</p>
+            <input type="text" id="confirm-input" autocomplete="off" placeholder="Type the trade name" />
+            <div style="display:flex;gap:var(--space-3);justify-content:flex-end">
+              <button class="btn btn-ghost" id="confirm-cancel">Cancel</button>
+              <button class="btn btn-danger" id="confirm-delete" disabled>Delete trade</button>
+            </div>
+          </div>
+        </div>
+      </div>`;
+
+    const input = modalRoot.querySelector("#confirm-input");
+    const deleteBtn = modalRoot.querySelector("#confirm-delete");
+    input.addEventListener("paste", (e) => e.preventDefault());
+    input.addEventListener("input", () => { deleteBtn.disabled = input.value !== name; });
+    modalRoot.querySelector("#confirm-cancel").addEventListener("click", () => { modalRoot.innerHTML = ""; });
+    modalRoot.querySelector(".confirm-backdrop").addEventListener("click", (e) => { if (e.target === e.currentTarget) modalRoot.innerHTML = ""; });
+    deleteBtn.addEventListener("click", async () => {
+      deleteBtn.disabled = true;
+      deleteBtn.textContent = "Deleting…";
+      try {
+        await delBody(`/super-admin/trades/${id}`, { confirmation: input.value });
+        toast("Trade deleted", "success");
+        modalRoot.innerHTML = "";
+        trades = await get("/super-admin/trades");
+        renderTrades();
+      } catch (err) {
+        toast(err.message || "Delete failed", "error");
+        deleteBtn.disabled = false;
+        deleteBtn.textContent = "Delete trade";
+      }
+    });
+  }
+
+  try {
+    trades = await get("/super-admin/trades");
+    renderTrades();
+  } catch (err) {
+    tradesBody.innerHTML = `<tr><td colspan="2">${err.message}</td></tr>`;
+  }
+
+  document.getElementById("trade-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const input = document.getElementById("trade-name");
+    const btn = document.getElementById("trade-submit");
+    const name = input.value.trim();
+    if (!name) return;
+    btn.disabled = true;
+    btn.textContent = "Adding…";
+    try {
+      await post("/super-admin/trades", { name });
+      toast("Trade added", "success");
+      input.value = "";
+      trades = await get("/super-admin/trades");
+      renderTrades();
+    } catch (err) {
+      toast(err.message || "Failed to add trade", "error");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Add trade";
+    }
+  });
+</script>

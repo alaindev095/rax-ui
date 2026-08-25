@@ -1,0 +1,163 @@
+<div class="page-header fade-in">
+  <div>
+    <h1>Registration Requests</h1>
+    <p>Schools and companies that asked to join from the landing page. Review, contact, and verify before onboarding them.</p>
+  </div>
+</div>
+
+<div class="card fade-in reg-toolbar-card">
+  <div class="card-body reg-toolbar">
+    <div class="reg-tabs">
+      <button type="button" class="reg-tab active" data-type="">All</button>
+      <button type="button" class="reg-tab" data-type="school">Schools</button>
+      <button type="button" class="reg-tab" data-type="company">Companies</button>
+    </div>
+    <select id="f-status">
+      <option value="">All statuses</option>
+      <option value="pending">Pending</option>
+      <option value="contacted">Contacted</option>
+      <option value="verified">Verified</option>
+      <option value="rejected">Rejected</option>
+    </select>
+  </div>
+</div>
+
+<div class="reg-list fade-in" id="reg-list">
+  <div class="empty-state"><h3>Loading…</h3></div>
+</div>
+
+<style>
+  .reg-toolbar-card .card-body { padding-bottom: var(--space-5); }
+  .reg-toolbar { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; justify-content: space-between; }
+  .reg-tabs { display: flex; gap: var(--space-2); }
+  .reg-tab { padding: var(--space-2) var(--space-4); border-radius: 999px; border: 1px solid var(--border); background: var(--surface); cursor: pointer; font-size: 0.875rem; font-weight: 600; color: var(--foreground-muted); }
+  .reg-tab.active { background: var(--accent, var(--primary)); color: #fff; border-color: transparent; }
+  #f-status { width: auto; min-width: 160px; }
+  .reg-list { display: flex; flex-direction: column; gap: var(--space-4); margin-top: var(--space-6); }
+  .reg-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--space-5); }
+  .reg-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
+  .reg-card-head h3 { margin: 0 0 var(--space-1); font-size: 1.0625rem; }
+  .reg-meta { font-size: 0.8125rem; color: var(--foreground-muted); }
+  .reg-body { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--space-3); margin: var(--space-4) 0; font-size: 0.875rem; }
+  .reg-body div span { display: block; color: var(--foreground-muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 2px; }
+  .reg-message { font-size: 0.875rem; background: var(--background); border-radius: var(--radius); padding: var(--space-3); margin-bottom: var(--space-4); }
+  .reg-notes textarea { width: 100%; }
+  .reg-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-4); }
+  .reg-actions .btn { padding: var(--space-2) var(--space-3); font-size: 0.8125rem; }
+</style>
+
+<script type="module">
+  const { get, patch } = await import("../assets/js/api.js");
+  const { escapeHtml, formatRelative } = await import("../assets/js/utils.js");
+  const { toast } = await import("../assets/js/alerts.js");
+  const { navigate } = await import("../assets/js/router.js");
+
+  const listEl = document.getElementById("reg-list");
+  const statusSelect = document.getElementById("f-status");
+  const tabs = document.querySelectorAll(".reg-tab");
+  let currentType = "";
+
+  tabs.forEach((tab) => {
+    tab.addEventListener("click", () => {
+      tabs.forEach((t) => t.classList.remove("active"));
+      tab.classList.add("active");
+      currentType = tab.dataset.type;
+      load();
+    });
+  });
+  statusSelect.addEventListener("change", load);
+
+  function statusBadgeClass(status) {
+    if (status === "verified") return "badge-success";
+    if (status === "rejected") return "badge-danger";
+    if (status === "contacted") return "badge-ai";
+    return "badge";
+  }
+
+  async function load() {
+    try {
+      const params = { type: currentType, status: statusSelect.value };
+      Object.keys(params).forEach((k) => !params[k] && delete params[k]);
+      const requests = await get("/super-admin/registration-requests", params);
+
+      listEl.innerHTML = requests.length
+        ? requests.map((r) => `
+          <article class="reg-card" data-id="${r.id}">
+            <div class="reg-card-head">
+              <div>
+                <h3>${escapeHtml(r.name)} <span class="badge">${r.type === "school" ? "School" : "Company"}</span></h3>
+                <div class="reg-meta">Submitted ${formatRelative(r.created_at)}${r.reviewed_by_name ? " • last reviewed by " + escapeHtml(r.reviewed_by_name) : ""}</div>
+              </div>
+              <span class="badge ${statusBadgeClass(r.status)}">${escapeHtml(r.status)}</span>
+            </div>
+
+            <div class="reg-body">
+              <div><span>Contact</span>${escapeHtml(r.contact_name)}</div>
+              <div><span>Email</span>${escapeHtml(r.email)}</div>
+              <div><span>Phone</span>${escapeHtml(r.phone || "—")}</div>
+              <div><span>Location</span>${escapeHtml([r.district, r.province].filter(Boolean).join(", ") || "—")}</div>
+              <div><span>Address</span>${escapeHtml(r.address || "—")}</div>
+            </div>
+
+            ${r.message ? `<div class="reg-message">${escapeHtml(r.message)}</div>` : ""}
+
+            <div class="reg-notes">
+              <label style="font-size:0.8125rem;color:var(--foreground-muted)">Internal notes (call log, outcome, etc.)</label>
+              <textarea rows="2" class="notes-input" placeholder="e.g. Called 08/22, confirmed details, sending onboarding link">${escapeHtml(r.admin_notes || "")}</textarea>
+            </div>
+
+            <div class="reg-actions">
+              <button class="btn btn-ghost save-notes-btn">Save notes</button>
+              <button class="btn btn-ghost mark-contacted-btn" ${r.status === "contacted" ? "disabled" : ""}>Mark contacted</button>
+              <button class="btn btn-primary verify-btn" ${r.status === "verified" ? "disabled" : ""}>Verify &amp; create account</button>
+              <button class="btn btn-danger reject-btn" ${r.status === "rejected" ? "disabled" : ""}>Reject</button>
+            </div>
+          </article>
+        `).join("")
+        : `<div class="empty-state"><h3>No requests found</h3><p>Try a different filter, or check back after the landing page gets some traffic.</p></div>`;
+
+      listEl.querySelectorAll(".reg-card").forEach((card) => {
+        const id = card.dataset.id;
+        const req = requests.find((r) => r.id === id);
+
+        card.querySelector(".save-notes-btn").addEventListener("click", async () => {
+          const notes = card.querySelector(".notes-input").value;
+          try {
+            await patch(`/super-admin/registration-requests/${id}`, { admin_notes: notes });
+            toast("Notes saved", "success");
+          } catch (err) { toast(err.message || "Could not save notes", "error"); }
+        });
+
+        card.querySelector(".mark-contacted-btn").addEventListener("click", async () => {
+          try {
+            await patch(`/super-admin/registration-requests/${id}`, { status: "contacted" });
+            toast("Marked as contacted", "success");
+            load();
+          } catch (err) { toast(err.message || "Failed", "error"); }
+        });
+
+        card.querySelector(".reject-btn").addEventListener("click", async () => {
+          try {
+            await patch(`/super-admin/registration-requests/${id}`, { status: "rejected" });
+            toast("Request rejected", "success");
+            load();
+          } catch (err) { toast(err.message || "Failed", "error"); }
+        });
+
+        card.querySelector(".verify-btn").addEventListener("click", async () => {
+          try {
+            await patch(`/super-admin/registration-requests/${id}`, { status: "verified" });
+            toast("Verified — now create the account", "success");
+            const key = req.type === "school" ? "umunara_prefill_school" : "umunara_prefill_company";
+            sessionStorage.setItem(key, JSON.stringify(req));
+            navigate(req.type === "school" ? "/super-admin/schools" : "/super-admin/companies");
+          } catch (err) { toast(err.message || "Failed", "error"); }
+        });
+      });
+    } catch (err) {
+      listEl.innerHTML = `<div class="empty-state"><h3>Couldn't load requests</h3><p>${err.message}</p></div>`;
+    }
+  }
+
+  await load();
+</script>

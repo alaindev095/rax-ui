@@ -1,0 +1,72 @@
+<div class="page-header fade-in">
+  <div>
+    <h1>Welcome back<span id="teacher-name"></span></h1>
+    <p>An overview of your notes, assignments, and submissions.</p>
+  </div>
+  <button class="btn btn-accent" data-nav="/teachers/notes">Upload a note</button>
+</div>
+
+<div class="dashboard-grid fade-in" id="teacher-stats">
+  <div class="stat-card"><div class="stat-label">Notes uploaded</div><div class="stat-value skeleton" style="height:1.75rem;width:3rem"></div></div>
+  <div class="stat-card"><div class="stat-label">Assignments created</div><div class="stat-value skeleton" style="height:1.75rem;width:3rem"></div></div>
+  <div class="stat-card"><div class="stat-label">Submissions received</div><div class="stat-value skeleton" style="height:1.75rem;width:3rem"></div></div>
+</div>
+
+<div class="card fade-in">
+  <div class="card-header">
+    <h2 class="section-title" style="margin:0">Recent submissions</h2>
+    <button class="btn btn-ghost" data-nav="/teachers/submissions">View all</button>
+  </div>
+  <div class="card-body" id="recent-submissions">
+    <div class="empty-state"><p>Loading…</p></div>
+  </div>
+</div>
+
+<script type="module">
+  const { get } = await import("../assets/js/api.js");
+  const { getUser } = await import("../assets/js/auth.js");
+  const { escapeHtml, formatRelative } = await import("../assets/js/utils.js");
+
+  const user = getUser();
+  document.getElementById("teacher-name").textContent = user ? `, ${user.fullname.split(" ")[0]}` : "";
+
+  try {
+    const [stats, submissions] = await Promise.all([
+      get("/teacher/stats"),
+      get("/teacher/submissions"),
+    ]);
+
+    document.getElementById("teacher-stats").innerHTML = `
+      <div class="stat-card">
+        <div class="stat-label">Notes uploaded</div>
+        <div class="stat-value">${stats.notes_count}</div>
+        <div class="stat-delta">&nbsp;</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Assignments created</div>
+        <div class="stat-value">${stats.assignments_count}</div>
+        <div class="stat-delta">&nbsp;</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Submissions received</div>
+        <div class="stat-value">${stats.submissions_count}</div>
+        <div class="stat-delta">${submissions.filter((s) => s.marks === null).length} awaiting grading</div>
+      </div>
+    `;
+
+    const recent = submissions.slice(0, 5);
+    document.getElementById("recent-submissions").innerHTML = recent.length
+      ? `<table><thead><tr><th>Student</th><th>Assignment</th><th>Submitted</th><th>Status</th></tr></thead><tbody>
+          ${recent.map((s) => `<tr>
+            <td data-label="Student"><strong>${escapeHtml(s.student_name)}</strong></td>
+            <td data-label="Assignment">${escapeHtml(s.assignment_title)}</td>
+            <td data-label="Submitted">${formatRelative(s.submitted_at)}</td>
+            <td data-label="Status">${s.marks !== null ? `<span class="badge badge-success">Graded</span>` : `<span class="badge badge-warning">Pending</span>`}</td>
+          </tr>`).join("")}
+        </tbody></table>`
+      : `<div class="empty-state"><h3>No submissions yet</h3><p>Nothing has been submitted to your assignments yet.</p></div>`;
+  } catch (err) {
+    const { toast } = await import("../assets/js/alerts.js");
+    toast(err.message || "Failed to load dashboard", "error");
+  }
+</script>

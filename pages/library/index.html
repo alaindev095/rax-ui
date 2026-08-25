@@ -1,0 +1,257 @@
+<div class="page-header fade-in">
+  <div>
+    <h1>Library</h1>
+    <p id="library-subtitle">Browse curriculum guides, past papers, and books. Everything opens in a view-only reader.</p>
+  </div>
+  <button class="btn btn-accent" id="toggle-upload" style="display:none">Upload resource</button>
+</div>
+
+<div class="card fade-in" id="upload-card" style="display:none">
+  <div class="card-header"><h2 class="section-title" style="margin:0">Upload a resource</h2></div>
+  <div class="card-body">
+    <form id="upload-form">
+      <div class="form-row">
+        <div class="form-group">
+          <label for="u-type">Type</label>
+          <select id="u-type" required>
+            <option value="curriculum">Curriculum</option>
+            <option value="past_papers">Past Papers</option>
+            <option value="books">Books</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="u-title">Title</label>
+          <input type="text" id="u-title" required placeholder="e.g. Senior 3 Biology — Term 2 curriculum" />
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="u-category">Category / Subject</label>
+          <input type="text" id="u-category" placeholder="e.g. Biology, Sciences" />
+        </div>
+        <div class="form-group">
+          <label for="u-grade">Grade / level</label>
+          <input type="text" id="u-grade" placeholder="e.g. Senior 3" />
+        </div>
+        <div class="form-group">
+          <label for="u-year">Year</label>
+          <input type="number" id="u-year" placeholder="e.g. 2025" />
+        </div>
+        <div class="form-group">
+          <label for="u-term">Term</label>
+          <input type="text" id="u-term" placeholder="e.g. Term 2" />
+        </div>
+      </div>
+
+      <div class="form-row" id="book-fields" style="display:none">
+        <div class="form-group">
+          <label for="u-author">Author</label>
+          <input type="text" id="u-author" />
+        </div>
+        <div class="form-group">
+          <label for="u-publisher">Publisher</label>
+          <input type="text" id="u-publisher" />
+        </div>
+        <div class="form-group">
+          <label for="u-pub-year">Publication year</label>
+          <input type="number" id="u-pub-year" />
+        </div>
+        <div class="form-group">
+          <label for="u-pages">Pages</label>
+          <input type="number" id="u-pages" />
+        </div>
+        <div class="form-group">
+          <label for="u-isbn">ISBN</label>
+          <input type="text" id="u-isbn" placeholder="Optional" />
+        </div>
+        <div class="form-group">
+          <label for="u-language">Language</label>
+          <input type="text" id="u-language" placeholder="e.g. English" />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="u-description">Description</label>
+        <textarea id="u-description" rows="2" placeholder="Optional — a short summary of what's inside"></textarea>
+      </div>
+
+      <div class="form-group">
+        <label for="u-file">PDF file</label>
+        <input type="file" id="u-file" accept="application/pdf" required />
+      </div>
+
+      <button type="submit" class="btn btn-primary" id="upload-submit">Upload resource</button>
+    </form>
+  </div>
+</div>
+
+<div class="card fade-in intern-toolbar-card">
+  <div class="card-body intern-toolbar">
+    <div class="search-box intern-search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" id="f-search" placeholder="Search title, author, description..." />
+    </div>
+    <select id="f-type">
+      <option value="">All types</option>
+      <option value="curriculum">Curriculum</option>
+      <option value="past_papers">Past Papers</option>
+      <option value="books">Books</option>
+    </select>
+  </div>
+</div>
+
+<div class="library-grid fade-in" id="library-grid" style="margin-top:var(--space-6)">
+  <div class="empty-state"><h3>Loading…</h3></div>
+</div>
+
+<style>
+  .intern-toolbar-card .card-body { padding-bottom: var(--space-5); }
+  .intern-toolbar { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; }
+  .intern-search { flex: 1 1 260px; min-width: 200px; }
+  .intern-toolbar select { width: auto; min-width: 160px; flex: 1 1 160px; }
+
+  .library-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--space-5); }
+  .lib-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--space-5); display: flex; flex-direction: column; }
+  .lib-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-2); margin-bottom: var(--space-2); }
+  .lib-card-head h3 { font-size: 1.0625rem; margin: 0; }
+  .lib-meta { font-size: 0.8125rem; color: var(--foreground-muted); margin-bottom: var(--space-3); }
+  .lib-desc { font-size: 0.875rem; color: var(--foreground-muted); margin-bottom: var(--space-3); flex: 1; }
+  .lib-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-top: auto; }
+  .lib-actions .btn { padding: var(--space-2) var(--space-3); font-size: 0.8125rem; }
+</style>
+
+<script type="module">
+  const { get, postForm, del } = await import("../../assets/js/api.js");
+  const { escapeHtml, formatRelative, openViewer } = await import("../../assets/js/utils.js");
+  const { toast, confirmDialog } = await import("../../assets/js/alerts.js");
+  const { getUser } = await import("../../assets/js/auth.js");
+
+  const user = getUser();
+  const isSuperAdmin = user && String(user.role).toLowerCase() === "super_admin";
+
+  const grid = document.getElementById("library-grid");
+  const searchInput = document.getElementById("f-search");
+  const typeSelect = document.getElementById("f-type");
+  const uploadCard = document.getElementById("upload-card");
+  const uploadTypeSelect = document.getElementById("u-type");
+  const bookFields = document.getElementById("book-fields");
+
+  const typeLabels = { curriculum: "Curriculum", past_papers: "Past Papers", books: "Books" };
+
+  let debounceTimer;
+  function debouncedLoad() { clearTimeout(debounceTimer); debounceTimer = setTimeout(load, 300); }
+
+  if (isSuperAdmin) {
+    document.getElementById("library-subtitle").textContent = "Upload and manage curriculum guides, past papers, and books for every school to browse.";
+    document.getElementById("toggle-upload").style.display = "";
+    document.getElementById("toggle-upload").addEventListener("click", () => {
+      uploadCard.style.display = uploadCard.style.display === "none" ? "block" : "none";
+    });
+    uploadTypeSelect.addEventListener("change", () => {
+      bookFields.style.display = uploadTypeSelect.value === "books" ? "flex" : "none";
+    });
+  }
+
+  async function load() {
+    try {
+      const params = { search: searchInput.value.trim(), type: typeSelect.value };
+      Object.keys(params).forEach((k) => !params[k] && delete params[k]);
+      const resources = await get("/library", params);
+
+      grid.innerHTML = resources.length
+        ? resources.map((r) => `
+          <article class="lib-card" data-id="${r.id}">
+            <div class="lib-card-head">
+              <h3>${escapeHtml(r.title)}</h3>
+              <span class="badge">${typeLabels[r.type] || escapeHtml(r.type)}</span>
+            </div>
+            <p class="lib-meta">
+              ${r.type === "books" && r.author ? escapeHtml(r.author) + " • " : ""}
+              ${r.category ? escapeHtml(r.category) + " • " : ""}
+              ${r.grade_level ? escapeHtml(r.grade_level) + " • " : ""}
+              Added ${formatRelative(r.created_at)}
+            </p>
+            ${r.description ? `<p class="lib-desc">${escapeHtml(r.description)}</p>` : ""}
+            <div class="lib-actions">
+              <button class="btn btn-primary open-btn" data-title="${escapeHtml(r.title)}" data-url="${escapeHtml(r.file_url)}">View</button>
+              ${isSuperAdmin ? `<button class="btn btn-danger delete-btn">Delete</button>` : ""}
+            </div>
+          </article>
+        `).join("")
+        : `<div class="empty-state" style="grid-column:1/-1"><h3>No resources found</h3><p>${isSuperAdmin ? "Upload the first curriculum guide, past paper, or book to get started." : "Try a different filter, or check back later."}</p></div>`;
+
+      grid.querySelectorAll(".open-btn").forEach((btn) => btn.addEventListener("click", () => {
+        // View-only — see utils.js openViewer / pages/viewer.html.
+        openViewer(btn.dataset.url, btn.dataset.title, { noDownload: true });
+      }));
+      grid.querySelectorAll(".delete-btn").forEach((btn) => btn.addEventListener("click", (e) => {
+        const card = e.target.closest(".lib-card");
+        confirmDialog({
+          title: "Delete resource",
+          message: "This will permanently remove this resource and its file. Continue?",
+          confirmText: "Delete",
+          onConfirm: async () => {
+            try {
+              await del(`/super-admin/library/${card.dataset.id}`);
+              toast("Resource deleted", "success");
+              load();
+            } catch (err) {
+              toast(err.message || "Delete failed", "error");
+            }
+          },
+        });
+      }));
+    } catch (err) {
+      grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><h3>Couldn't load the library</h3><p>${err.message}</p></div>`;
+    }
+  }
+
+  if (isSuperAdmin) {
+    document.getElementById("upload-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById("upload-submit");
+      const fileInput = document.getElementById("u-file");
+      if (!fileInput.files.length) return;
+
+      const fd = new FormData();
+      fd.append("type", uploadTypeSelect.value);
+      fd.append("title", document.getElementById("u-title").value.trim());
+      fd.append("category", document.getElementById("u-category").value.trim());
+      fd.append("grade_level", document.getElementById("u-grade").value.trim());
+      fd.append("year", document.getElementById("u-year").value);
+      fd.append("term", document.getElementById("u-term").value.trim());
+      fd.append("description", document.getElementById("u-description").value.trim());
+      if (uploadTypeSelect.value === "books") {
+        fd.append("author", document.getElementById("u-author").value.trim());
+        fd.append("publisher", document.getElementById("u-publisher").value.trim());
+        fd.append("publication_year", document.getElementById("u-pub-year").value);
+        fd.append("pages", document.getElementById("u-pages").value);
+        fd.append("isbn", document.getElementById("u-isbn").value.trim());
+        fd.append("language", document.getElementById("u-language").value.trim());
+      }
+      fd.append("file", fileInput.files[0]);
+
+      btn.disabled = true;
+      btn.textContent = "Uploading…";
+      try {
+        await postForm("/super-admin/library", fd);
+        toast("Resource uploaded", "success");
+        e.target.reset();
+        bookFields.style.display = "none";
+        uploadCard.style.display = "none";
+        await load();
+      } catch (err) {
+        toast(err.message || "Upload failed", "error");
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Upload resource";
+      }
+    });
+  }
+
+  await load();
+
+  typeSelect.addEventListener("change", load);
+  searchInput.addEventListener("input", debouncedLoad);
+</script>

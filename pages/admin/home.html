@@ -1,0 +1,55 @@
+<div class="page-header fade-in">
+  <div>
+    <h1>Admin Dashboard</h1>
+    <p>An overview of Umunara's users and content.</p>
+  </div>
+  <div style="display:flex;gap:var(--space-3)">
+    <button class="btn btn-ghost" data-nav="/admin/academics">Manage academics</button>
+    <button class="btn btn-accent" data-nav="/admin/users">Manage users</button>
+  </div>
+</div>
+
+<div class="dashboard-grid fade-in" id="admin-stats">
+  <div class="stat-card"><div class="stat-label">Teachers</div><div class="stat-value skeleton" style="height:1.75rem;width:3rem"></div></div>
+  <div class="stat-card"><div class="stat-label">Students</div><div class="stat-value skeleton" style="height:1.75rem;width:3rem"></div></div>
+  <div class="stat-card"><div class="stat-label">Classes</div><div class="stat-value skeleton" style="height:1.75rem;width:3rem"></div></div>
+  <div class="stat-card"><div class="stat-label">Subjects</div><div class="stat-value skeleton" style="height:1.75rem;width:3rem"></div></div>
+</div>
+
+<div class="card fade-in">
+  <div class="card-header">
+    <h2 class="section-title" style="margin:0">Recently joined</h2>
+    <button class="btn btn-ghost" data-nav="/admin/users">View all users</button>
+  </div>
+  <div class="card-body" id="recent-users">
+    <div class="empty-state"><p>Loading…</p></div>
+  </div>
+</div>
+
+<script type="module">
+  const { get } = await import("../assets/js/api.js");
+  const { escapeHtml, formatRelative } = await import("../assets/js/utils.js");
+
+  try {
+    const [users, teachers, students, classes, subjects] = await Promise.all([
+      get("/admin/users"), get("/admin/teachers"), get("/admin/students"), get("/admin/classes"), get("/admin/subjects"),
+    ]);
+
+    document.getElementById("admin-stats").innerHTML = `
+      <div class="stat-card"><div class="stat-label">Teachers</div><div class="stat-value">${teachers.length}</div><div class="stat-delta">&nbsp;</div></div>
+      <div class="stat-card"><div class="stat-label">Students</div><div class="stat-value">${students.length}</div><div class="stat-delta">&nbsp;</div></div>
+      <div class="stat-card"><div class="stat-label">Classes</div><div class="stat-value">${classes.length}</div><div class="stat-delta">&nbsp;</div></div>
+      <div class="stat-card"><div class="stat-label">Subjects</div><div class="stat-value">${subjects.length}</div><div class="stat-delta">&nbsp;</div></div>
+    `;
+
+    const recent = users.slice().sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 6);
+    document.getElementById("recent-users").innerHTML = recent.length
+      ? `<table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Joined</th></tr></thead><tbody>
+          ${recent.map((u) => `<tr><td data-label="Name"><strong>${escapeHtml(u.fullname)}</strong></td><td data-label="Email">${escapeHtml(u.email)}</td><td data-label="Role"><span class="badge">${escapeHtml(u.role)}</span></td><td data-label="Joined">${formatRelative(u.created_at)}</td></tr>`).join("")}
+        </tbody></table>`
+      : `<div class="empty-state"><h3>No users yet</h3></div>`;
+  } catch (err) {
+    const { toast } = await import("../assets/js/alerts.js");
+    toast(err.message || "Failed to load dashboard", "error");
+  }
+</script>

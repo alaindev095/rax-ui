@@ -1,0 +1,263 @@
+<div class="page-header fade-in">
+  <div>
+    <button class="btn btn-ghost btn-sm" id="back-btn">&larr; Back to schools</button>
+  </div>
+</div>
+
+<div id="detail-root" class="fade-in">
+  <div class="empty-state"><h3>Loading…</h3></div>
+</div>
+
+<style>
+  .btn-sm { padding: var(--space-2) var(--space-4); font-size: 0.875rem; }
+  .detail-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--space-4); margin-bottom: var(--space-6); }
+  .detail-stat { background: var(--surface); border-radius: var(--radius); padding: var(--space-4); text-align: center; }
+  .detail-stat strong { display: block; font-size: 1.5rem; }
+  .detail-stat span { font-size: 0.75rem; color: var(--foreground-muted); text-transform: uppercase; letter-spacing: 0.03em; }
+  .form-subheading { font-size: 0.875rem; font-weight: 700; color: var(--foreground-muted); text-transform: uppercase; letter-spacing: 0.04em; margin: var(--space-5) 0 var(--space-3); }
+  .form-subheading:first-child { margin-top: 0; }
+  .danger-zone { border: 1px solid var(--danger, #dc2626); }
+  .danger-zone .section-title { color: var(--danger, #dc2626); }
+  .confirm-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; padding: var(--space-5); z-index: 200; }
+  .confirm-panel { background: var(--background); border-radius: var(--radius); max-width: 440px; width: 100%; }
+  .confirm-panel .card-body { display: flex; flex-direction: column; gap: var(--space-3); }
+</style>
+
+<script type="module">
+  const { get, patch, delBody } = await import("../../assets/js/api.js");
+  const { escapeHtml, formatDate } = await import("../../assets/js/utils.js");
+  const { toast } = await import("../../assets/js/alerts.js");
+  const { navigate } = await import("../../assets/js/router.js");
+
+  const root = document.getElementById("detail-root");
+  document.getElementById("back-btn").addEventListener("click", () => navigate("/super-admin/schools"));
+
+  const id = sessionStorage.getItem("umunara_school_id");
+  if (!id) {
+    root.innerHTML = `<div class="empty-state"><h3>No school selected</h3><p>Go back and pick one from the list.</p></div>`;
+  } else {
+    try {
+      const s = await get(`/super-admin/schools/${id}`);
+      root.innerHTML = `
+        <div class="page-header" style="margin-bottom:var(--space-5)">
+          <div>
+            <span class="badge ${s.is_active === false ? "badge-danger" : "badge-success"}">${s.is_active === false ? "Deactivated" : "Active"}</span>
+          </div>
+          <button class="btn btn-sm ${s.is_active === false ? "btn-primary" : "btn-ghost"}" id="status-btn">${s.is_active === false ? "Activate school" : "Deactivate school"}</button>
+        </div>
+
+        <div class="detail-stats">
+          <div class="detail-stat"><strong>${s.admin_count}</strong><span>Admins</span></div>
+          <div class="detail-stat"><strong>${s.teacher_count}</strong><span>Teachers</span></div>
+          <div class="detail-stat"><strong>${s.student_count}</strong><span>Students</span></div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><h2 class="section-title" style="margin:0">${escapeHtml(s.name)}</h2></div>
+          <div class="card-body">
+            <form id="edit-form" class="form-row">
+              <div class="form-group"><label for="s-name">School name</label><input type="text" id="s-name" required /></div>
+              <div class="form-group"><label for="s-district">District</label><input type="text" id="s-district" /></div>
+              <div class="form-group"><label for="s-province">Province</label><input type="text" id="s-province" /></div>
+              <div class="form-group"><label for="s-phone">Phone</label><input type="text" id="s-phone" /></div>
+              <div class="form-group"><label for="s-email">School email</label><input type="email" id="s-email" /></div>
+              <div class="form-group" style="grid-column:1/-1"><label for="s-address">Address</label><input type="text" id="s-address" /></div>
+              <div class="form-group"><button type="submit" class="btn btn-primary" id="save-btn">Save changes</button></div>
+            </form>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:var(--space-6)">
+          <div class="card-header"><h2 class="section-title" style="margin:0">Admin accounts</h2></div>
+          <div class="card-body">
+            <p style="color:var(--foreground-muted);margin-top:0;font-size:0.875rem">Click Edit to correct a name or email in place — nothing is deleted, so the account's history is preserved.</p>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Name</th><th>Email</th><th>Joined</th><th></th></tr></thead>
+                <tbody id="admins-body">
+                  ${s.admins.length
+                    ? s.admins.map((a) => `<tr data-admin-id="${a.id}">
+                        <td data-label="Name" class="admin-name">${escapeHtml(a.fullname)}</td>
+                        <td data-label="Email" class="admin-email">${escapeHtml(a.email)}</td>
+                        <td data-label="Joined">${formatDate(a.created_at)}</td>
+                        <td><button class="btn btn-ghost btn-sm edit-admin-btn" data-id="${a.id}" data-name="${escapeHtml(a.fullname)}" data-email="${escapeHtml(a.email)}">Edit</button></td>
+                      </tr>`).join("")
+                    : `<tr><td colspan="4"><div class="empty-state"><h3>No admins yet</h3></div></td></tr>`}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="card danger-zone" style="margin-top:var(--space-6)">
+          <div class="card-header"><h2 class="section-title" style="margin:0">Danger zone</h2></div>
+          <div class="card-body">
+            <p>Deleting this school removes it, and every admin, teacher, and student account that belongs to it. This cannot be undone.</p>
+            <button class="btn btn-danger" id="delete-school-btn">Delete school</button>
+          </div>
+        </div>`;
+
+      let currentActive = s.is_active !== false;
+      document.getElementById("status-btn").addEventListener("click", async (e) => {
+        const btn = e.target;
+        btn.disabled = true;
+        try {
+          await patch(`/super-admin/schools/${id}/status`, { is_active: !currentActive });
+          toast(currentActive ? "School deactivated — logins are now blocked" : "School activated", "success");
+          navigate("/super-admin/schools/detail");
+        } catch (err) {
+          toast(err.message || "Failed", "error");
+          btn.disabled = false;
+        }
+      });
+
+      root.querySelectorAll(".edit-admin-btn").forEach((btn) => btn.addEventListener("click", () => {
+        openEditUser({
+          id: btn.dataset.id,
+          name: btn.dataset.name,
+          email: btn.dataset.email,
+          onSaved: (updated) => {
+            const row = root.querySelector(`tr[data-admin-id="${btn.dataset.id}"]`);
+            if (row) {
+              row.querySelector(".admin-name").textContent = updated.fullname;
+              row.querySelector(".admin-email").textContent = updated.email;
+              btn.dataset.name = updated.fullname;
+              btn.dataset.email = updated.email;
+            }
+          },
+        });
+      }));
+
+      document.getElementById("s-name").value = s.name || "";
+      document.getElementById("s-district").value = s.district || "";
+      document.getElementById("s-province").value = s.province || "";
+      document.getElementById("s-phone").value = s.phone || "";
+      document.getElementById("s-email").value = s.email || "";
+      document.getElementById("s-address").value = s.address || "";
+
+      document.getElementById("edit-form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const btn = document.getElementById("save-btn");
+        btn.disabled = true;
+        btn.textContent = "Saving…";
+        try {
+          await patch(`/super-admin/schools/${id}`, {
+            name: document.getElementById("s-name").value.trim(),
+            district: document.getElementById("s-district").value.trim() || null,
+            province: document.getElementById("s-province").value.trim() || null,
+            phone: document.getElementById("s-phone").value.trim() || null,
+            email: document.getElementById("s-email").value.trim() || null,
+            address: document.getElementById("s-address").value.trim() || null,
+          });
+          toast("School updated", "success");
+        } catch (err) {
+          toast(err.message || "Update failed", "error");
+        } finally {
+          btn.disabled = false;
+          btn.textContent = "Save changes";
+        }
+      });
+      document.getElementById("delete-school-btn").addEventListener("click", () => {
+        openDeleteConfirm({
+          entityLabel: "school",
+          name: s.name,
+          onConfirm: async (typedName) => {
+            await delBody(`/super-admin/schools/${id}`, { confirmation: typedName });
+            toast("School deleted", "success");
+            navigate("/super-admin/schools");
+          },
+        });
+      });
+    } catch (err) {
+      root.innerHTML = `<div class="empty-state"><h3>Couldn't load school</h3><p>${err.message}</p></div>`;
+    }
+  }
+
+  // Shared "edit user in place" modal — used for editing a school-admin's
+  // name/email via the super-admin-wide PATCH /super-admin/users/:id
+  // endpoint. Updating in place (rather than delete+recreate) preserves
+  // the account's history.
+  function openEditUser({ id, name, email, onSaved }) {
+    const modalRoot = document.getElementById("modal-root") || document.body;
+    const overlay = document.createElement("div");
+    overlay.className = "confirm-backdrop";
+    overlay.innerHTML = `
+      <div class="card confirm-panel">
+        <div class="card-header"><h2 class="section-title" style="margin:0">Edit account</h2></div>
+        <div class="card-body">
+          <div class="form-group"><label for="eu-name">Full name</label><input type="text" id="eu-name" /></div>
+          <div class="form-group"><label for="eu-email">Email</label><input type="email" id="eu-email" /></div>
+          <div style="display:flex;gap:var(--space-3);justify-content:flex-end">
+            <button class="btn btn-ghost" id="eu-cancel">Cancel</button>
+            <button class="btn btn-primary" id="eu-save">Save changes</button>
+          </div>
+        </div>
+      </div>`;
+    modalRoot.appendChild(overlay);
+
+    overlay.querySelector("#eu-name").value = name || "";
+    overlay.querySelector("#eu-email").value = email || "";
+    overlay.querySelector("#eu-cancel").addEventListener("click", () => overlay.remove());
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
+
+    overlay.querySelector("#eu-save").addEventListener("click", async () => {
+      const saveBtn = overlay.querySelector("#eu-save");
+      saveBtn.disabled = true;
+      saveBtn.textContent = "Saving…";
+      try {
+        const updated = await patch(`/super-admin/users/${id}`, {
+          fullname: overlay.querySelector("#eu-name").value.trim(),
+          email: overlay.querySelector("#eu-email").value.trim(),
+        });
+        toast("Account updated", "success");
+        onSaved(updated);
+        overlay.remove();
+      } catch (err) {
+        toast(err.message || "Update failed", "error");
+        saveBtn.disabled = false;
+        saveBtn.textContent = "Save changes";
+      }
+    });
+  }
+
+  // Shared guarded-delete confirmation: the exact name must be re-typed
+  // (paste is disabled) before the Delete button is enabled at all — a
+  // deliberate extra step so this can't be triggered by an accidental click.
+  function openDeleteConfirm({ entityLabel, name, onConfirm }) {
+    const modalRoot = document.getElementById("modal-root") || document.body;
+    const overlay = document.createElement("div");
+    overlay.className = "confirm-backdrop";
+    overlay.innerHTML = `
+      <div class="card confirm-panel">
+        <div class="card-header"><h2 class="section-title" style="margin:0">Delete ${entityLabel}</h2></div>
+        <div class="card-body">
+          <p>This cannot be undone. Type <strong>${escapeHtml(name)}</strong> below to confirm.</p>
+          <input type="text" id="confirm-input" autocomplete="off" placeholder="Type the ${entityLabel} name" />
+          <div style="display:flex;gap:var(--space-3);justify-content:flex-end">
+            <button class="btn btn-ghost" id="confirm-cancel">Cancel</button>
+            <button class="btn btn-danger" id="confirm-delete" disabled>Delete ${entityLabel}</button>
+          </div>
+        </div>
+      </div>`;
+    modalRoot.appendChild(overlay);
+
+    const input = overlay.querySelector("#confirm-input");
+    const deleteBtn = overlay.querySelector("#confirm-delete");
+    input.addEventListener("paste", (e) => e.preventDefault());
+    input.addEventListener("input", () => { deleteBtn.disabled = input.value !== name; });
+    overlay.querySelector("#confirm-cancel").addEventListener("click", () => overlay.remove());
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
+    deleteBtn.addEventListener("click", async () => {
+      deleteBtn.disabled = true;
+      deleteBtn.textContent = "Deleting…";
+      try {
+        await onConfirm(input.value);
+        overlay.remove();
+      } catch (err) {
+        toast(err.message || "Delete failed", "error");
+        deleteBtn.disabled = false;
+        deleteBtn.textContent = `Delete ${entityLabel}`;
+      }
+    });
+  }
+</script>

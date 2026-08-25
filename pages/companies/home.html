@@ -1,0 +1,88 @@
+<div class="page-header fade-in">
+  <div>
+    <h1>Company Dashboard</h1>
+    <p>An overview of your internships and applicants.</p>
+  </div>
+  <button class="btn btn-primary" data-nav="/companies/internships">Manage internships</button>
+</div>
+
+<div class="dashboard-grid fade-in" id="stats-grid">
+  <div class="card stat-card"><div class="card-body"><span class="stat-label">Total internships</span><span class="stat-value skeleton" style="width:3rem;height:1.75rem"></span></div></div>
+</div>
+
+<div class="card fade-in" id="verify-card" style="margin-top:var(--space-6);display:none">
+</div>
+
+<div class="card fade-in" style="margin-top:var(--space-6)">
+  <div class="card-header"><h2 class="section-title" style="margin:0">Your internships</h2></div>
+  <div class="card-body">
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Title</th><th>Trade</th><th>Positions</th><th>Status</th><th></th></tr></thead>
+        <tbody id="internships-body"><tr><td colspan="5">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<style>
+  .stat-card .card-body { display: flex; flex-direction: column; gap: var(--space-1); }
+  .stat-label { font-size: 0.8125rem; color: var(--foreground-muted); }
+  .stat-value { font-size: 1.75rem; font-weight: 700; }
+  .btn-sm { padding: var(--space-2) var(--space-4); font-size: 0.875rem; }
+</style>
+
+<script type="module">
+  const { get } = await import("../assets/js/api.js");
+  const { escapeHtml } = await import("../assets/js/utils.js");
+  const { navigate } = await import("../assets/js/router.js");
+
+  const statsGrid = document.getElementById("stats-grid");
+  const body = document.getElementById("internships-body");
+  const verifyCard = document.getElementById("verify-card");
+
+  function statCard(label, value) {
+    return `<div class="card stat-card"><div class="card-body"><span class="stat-label">${label}</span><span class="stat-value">${value}</span></div></div>`;
+  }
+
+  try {
+    const [stats, profile, internships] = await Promise.all([
+      get("/company/stats"), get("/company/profile"), get("/company/internships"),
+    ]);
+
+    statsGrid.innerHTML = [
+      statCard("Total internships", stats.total_internships),
+      statCard("Open", stats.open_internships),
+      statCard("Total applicants", stats.total_applicants),
+      statCard("Pending review", stats.pending_review),
+      statCard("Accepted", stats.accepted),
+      statCard("Remaining positions", stats.remaining_positions),
+    ].join("");
+
+    if (!profile.verified) {
+      verifyCard.style.display = "";
+      verifyCard.innerHTML = `<div class="card-body" style="display:flex;align-items:center;gap:var(--space-3)">
+        <span class="badge badge-warning">Unverified</span>
+        <p style="margin:0;color:var(--foreground-muted)">Your company isn't verified yet. Verified companies show a trust badge to students — ask your partner school to verify you.</p>
+      </div>`;
+    }
+
+    body.innerHTML = internships.length
+      ? internships.slice(0, 8).map((i) => `<tr>
+          <td data-label="Title"><strong>${escapeHtml(i.title)}</strong></td>
+          <td data-label="Trade">${escapeHtml(i.trade_name || "—")}</td>
+          <td data-label="Positions">${i.positions_available} / ${i.positions_total}</td>
+          <td data-label="Status"><span class="badge ${i.status === "open" ? "badge-success" : i.status === "full" ? "badge-warning" : "badge"}">${escapeHtml(i.status)}</span></td>
+          <td><button class="btn btn-ghost btn-sm view-btn" data-id="${i.id}">View applicants</button></td>
+        </tr>`).join("")
+      : `<tr><td colspan="5"><div class="empty-state"><h3>No internships yet</h3><p>Publish your first internship to start receiving applicants.</p><button class="btn btn-primary" data-nav="/companies/internships" style="margin-top:var(--space-3)">Create internship</button></div></td></tr>`;
+
+    body.querySelectorAll(".view-btn").forEach((btn) => btn.addEventListener("click", () => {
+      sessionStorage.setItem("umunara_internship_id", btn.dataset.id);
+      navigate("/companies/applicants");
+    }));
+    body.querySelectorAll("[data-nav]").forEach((el) => el.addEventListener("click", () => navigate(el.dataset.nav)));
+  } catch (err) {
+    body.innerHTML = `<tr><td colspan="5">${err.message}</td></tr>`;
+  }
+</script>

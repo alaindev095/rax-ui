@@ -1,0 +1,152 @@
+<div class="register-page fade-in">
+  <div class="register-shell">
+    <div class="register-brand">
+      <div class="logo-icon">U</div>
+      <span>Umunara</span>
+    </div>
+
+    <div class="register-card" id="register-card">
+      <div class="register-head">
+        <h1>Bring your school or company onto Umunara</h1>
+        <p>Tell us a bit about you. Our team will review your request and reach out to verify your account — no waiting on a form to "just work."</p>
+      </div>
+
+      <div class="register-tabs" role="tablist">
+        <button type="button" class="register-tab active" data-tab="school" role="tab" aria-selected="true">Register a School</button>
+        <button type="button" class="register-tab" data-tab="company" role="tab" aria-selected="false">Register a Company</button>
+      </div>
+
+      <form id="register-form">
+        <div class="form-group">
+          <label id="name-label" for="r-name">School name</label>
+          <input type="text" id="r-name" required placeholder="e.g. Kigali Secondary School" />
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="r-contact">Contact person</label>
+            <input type="text" id="r-contact" required placeholder="Full name" />
+          </div>
+          <div class="form-group">
+            <label for="r-email">Email</label>
+            <input type="email" id="r-email" required placeholder="you@example.com" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="r-phone">Phone</label>
+            <input type="tel" id="r-phone" placeholder="Optional" />
+          </div>
+          <div class="form-group">
+            <label for="r-district">District</label>
+            <input type="text" id="r-district" placeholder="Optional" />
+          </div>
+          <div class="form-group">
+            <label for="r-province">Province</label>
+            <input type="text" id="r-province" placeholder="Optional" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="r-address">Address</label>
+          <input type="text" id="r-address" placeholder="Optional" />
+        </div>
+        <div class="form-group">
+          <label id="message-label" for="r-message">Anything else we should know?</label>
+          <textarea id="r-message" rows="3" placeholder="Optional"></textarea>
+        </div>
+
+        <button type="submit" class="btn btn-accent l-btn-lg" id="register-submit" style="width:100%">Submit request</button>
+      </form>
+
+      <p class="register-back"><a href="/" data-nav="/">← Back to home</a> · <a href="/login" data-nav="/login">Already have an account? Sign in</a></p>
+    </div>
+
+    <div class="register-card register-success" id="register-success" style="display:none">
+      <div class="register-success-icon">
+        <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+      </div>
+      <h2>Request received</h2>
+      <p id="register-success-message">Thanks — we've received your request. Our team will review it and reach out soon.</p>
+      <p class="register-success-sub">A super-admin will verify your details (by phone or email) before your account is activated.</p>
+      <a href="/" data-nav="/" class="btn btn-primary">Back to home</a>
+    </div>
+  </div>
+</div>
+
+<style>
+  .register-page { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: var(--space-6) var(--space-4); background: var(--background); }
+  .register-shell { width: 100%; max-width: 560px; }
+  .register-brand { display: flex; align-items: center; gap: var(--space-2); font-weight: 700; font-size: 1.125rem; margin-bottom: var(--space-6); justify-content: center; }
+  .register-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg, var(--radius)); padding: var(--space-7, 2rem); box-shadow: var(--shadow-md, 0 4px 16px rgba(0,0,0,0.06)); }
+  .register-head h1 { font-size: 1.375rem; margin: 0 0 var(--space-2); }
+  .register-head p { color: var(--foreground-muted); margin: 0 0 var(--space-5); font-size: 0.9375rem; }
+  .register-tabs { display: flex; gap: var(--space-2); margin-bottom: var(--space-5); border-bottom: 1px solid var(--border); }
+  .register-tab { flex: 1; background: none; border: none; padding: var(--space-3); font-weight: 600; color: var(--foreground-muted); cursor: pointer; border-bottom: 2px solid transparent; font-size: 0.9375rem; }
+  .register-tab.active { color: var(--accent, var(--primary)); border-bottom-color: var(--accent, var(--primary)); }
+  .register-back { text-align: center; margin-top: var(--space-5); font-size: 0.875rem; color: var(--foreground-muted); }
+  .register-success { text-align: center; }
+  .register-success-icon { color: var(--success, #16a34a); margin-bottom: var(--space-4); }
+  .register-success h2 { margin: 0 0 var(--space-2); }
+  .register-success p { margin: 0 0 var(--space-2); }
+  .register-success-sub { color: var(--foreground-muted); font-size: 0.875rem; margin-bottom: var(--space-5) !important; }
+</style>
+
+<script type="module">
+  const { post } = await import("../assets/js/api.js");
+  const { toast } = await import("../assets/js/alerts.js");
+
+  let currentType = "school";
+  const tabs = document.querySelectorAll(".register-tab");
+  const nameLabel = document.getElementById("name-label");
+  const nameInput = document.getElementById("r-name");
+  const messageLabel = document.getElementById("message-label");
+
+  function applyTabCopy() {
+    if (currentType === "school") {
+      nameLabel.textContent = "School name";
+      nameInput.placeholder = "e.g. Kigali Secondary School";
+      messageLabel.textContent = "Anything else we should know about your school?";
+    } else {
+      nameLabel.textContent = "Company name";
+      nameInput.placeholder = "e.g. TechHub Ltd";
+      messageLabel.textContent = "What trades or roles are you looking to offer internships in?";
+    }
+  }
+
+  tabs.forEach((tab) => {
+    tab.addEventListener("click", () => {
+      tabs.forEach((t) => { t.classList.remove("active"); t.setAttribute("aria-selected", "false"); });
+      tab.classList.add("active");
+      tab.setAttribute("aria-selected", "true");
+      currentType = tab.dataset.tab;
+      applyTabCopy();
+    });
+  });
+  applyTabCopy();
+
+  document.getElementById("register-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById("register-submit");
+    const payload = {
+      name: nameInput.value.trim(),
+      contact_name: document.getElementById("r-contact").value.trim(),
+      email: document.getElementById("r-email").value.trim(),
+      phone: document.getElementById("r-phone").value.trim(),
+      district: document.getElementById("r-district").value.trim(),
+      province: document.getElementById("r-province").value.trim(),
+      address: document.getElementById("r-address").value.trim(),
+      message: document.getElementById("r-message").value.trim(),
+    };
+    btn.disabled = true;
+    btn.textContent = "Submitting…";
+    try {
+      const res = await post(`/auth/register/${currentType}`, payload);
+      document.getElementById("register-card").style.display = "none";
+      document.getElementById("register-success").style.display = "block";
+      if (res?.message) document.getElementById("register-success-message").textContent = res.message;
+    } catch (err) {
+      toast(err.message || "Could not submit your request", "error");
+      btn.disabled = false;
+      btn.textContent = "Submit request";
+    }
+  });
+</script>

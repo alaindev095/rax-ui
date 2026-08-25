@@ -1,0 +1,80 @@
+/* Umunara — Design Tokens */
+
+:root {
+  /* Base radius */
+  --radius: 0.75rem;
+
+  /* Brand palette */
+  --navy-950: #0b1220;
+  --navy-900: #0f172a;
+  --navy-800: #1e293b;
+  --navy-700: #334155;
+  --gold-500: #f59e0b;
+  --gold-400: #fbbf24;
+  --gold-600: #d97706;
+  --teal-500: #14b8a6;
+  --teal-400: #2dd4bf;
+  --rose-500: #f43f5e;
+
+  /* Semantic colors — light mode */
+  --background: #ffffff;
+  --surface: #f8fafc;
+  --surface-elevated: #ffffff;
+  --foreground: #0f172a;
+  --foreground-muted: #64748b;
+  --primary: #0f172a;
+  --primary-foreground: #ffffff;
+  --accent: #f59e0b;
+  --accent-foreground: #0f172a;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --info: #3b82f6;
+  --border: #e2e8f0;
+  --border-subtle: #f1f5f9;
+  --ring: #f59e0b;
+  --shadow-color: 215 25% 27%;
+
+  /* Typography */
+  --font-sans: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-display: "Space Grotesk", var(--font-sans);
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Spacing scale */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px 0 rgb(var(--shadow-color) / 0.06);
+  --shadow-md: 0 4px 6px -1px rgb(var(--shadow-color) / 0.08), 0 2px 4px -2px rgb(var(--shadow-color) / 0.06);
+  --shadow-lg: 0 10px 15px -3px rgb(var(--shadow-color) / 0.08), 0 4px 6px -4px rgb(var(--shadow-color) / 0.06);
+  --shadow-xl: 0 20px 25px -5px rgb(var(--shadow-color) / 0.1), 0 8px 10px -6px rgb(var(--shadow-color) / 0.08);
+}
+
+.dark {
+  --background: #0b1220;
+  --surface: #0f172a;
+  --surface-elevated: #1e293b;
+  --foreground: #f8fafc;
+  --foreground-muted: #94a3b8;
+  --primary: #f8fafc;
+  --primary-foreground: #0f172a;
+  --accent: #fbbf24;
+  --accent-foreground: #0f172a;
+  --border: #334155;
+  --border-subtle: #1e293b;
+  --shadow-color: 220 40% 5%;
+}
+
+/* Default theme is light. Dark mode only applies when JS adds a
+   `.dark` class to <html> (see assets/js/utils.js setTheme/getTheme) — we
+   intentionally do NOT fall back to the OS `prefers-color-scheme` here, so
+   the app always starts light regardless of system settings. */

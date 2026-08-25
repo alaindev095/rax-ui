@@ -1,0 +1,359 @@
+<div class="page-header fade-in">
+  <div>
+    <h1>User Management</h1>
+    <p>Create and manage teacher and student accounts.</p>
+  </div>
+  <div style="display:flex;gap:var(--space-3)">
+    <button class="btn btn-ghost" id="toggle-bulk">Bulk import (CSV/Excel)</button>
+    <button class="btn btn-accent" id="toggle-create">Add user</button>
+  </div>
+</div>
+
+<div class="card fade-in" id="bulk-card" style="display:none">
+  <div class="card-header"><h2 class="section-title" style="margin:0">Bulk import</h2></div>
+  <div class="card-body">
+    <p style="color:var(--foreground-muted);margin-top:0">
+      Upload a .csv or .xlsx file with a header row (legacy .xls is not supported — save as .xlsx instead). Columns (case-insensitive): <code>fullname</code>, <code>email</code>.
+      Any <code>password</code> column is ignored — a secure temporary password is always generated and emailed to each person automatically.
+      For students, also: <code>class</code>, <code>trade</code>, <code>registration_number</code> (all optional).
+      For teachers, also: <code>subjects</code> (comma-separated, optional).
+    </p>
+    <form id="bulk-form" class="inline-form">
+      <div class="form-group" style="max-width:180px">
+        <label for="bulk-role" class="sr-only">Role</label>
+        <select id="bulk-role">
+          <option value="student">Students</option>
+          <option value="teacher">Teachers</option>
+        </select>
+      </div>
+      <div class="form-group" style="flex:1">
+        <label for="bulk-file" class="sr-only">File</label>
+        <input type="file" id="bulk-file" accept=".csv,.xlsx" required />
+      </div>
+      <button type="submit" class="btn btn-primary" id="bulk-submit">Import</button>
+    </form>
+    <div id="bulk-results" style="margin-top:var(--space-4)"></div>
+  </div>
+</div>
+
+<div class="card fade-in" id="create-card" style="display:none">
+  <div class="card-header"><h2 class="section-title" style="margin:0">New user</h2></div>
+  <div class="card-body">
+    <form id="create-form">
+      <div class="form-row">
+        <div class="form-group">
+          <label for="u-role">Role</label>
+          <select id="u-role">
+            <option value="student">Student</option>
+            <option value="teacher">Teacher</option>
+            <option value="admin">School Admin</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="u-name">Full name</label>
+          <input type="text" id="u-name" required />
+        </div>
+        <div class="form-group">
+          <label for="u-email">Email</label>
+          <input type="email" id="u-email" required />
+        </div>
+        <div class="form-group" id="class-field">
+          <label for="u-class">Class <span id="class-required-mark" style="color:var(--danger,#dc2626)">*</span></label>
+          <select id="u-class" required><option value="">Select a class</option></select>
+          <p style="font-size:0.75rem;color:var(--foreground-muted);margin:var(--space-1) 0 0">Students must belong to a class — create one first under Academics if the list is empty.</p>
+        </div>
+      </div>
+      <p style="font-size:0.8125rem;color:var(--foreground-muted);margin:0 0 var(--space-3)">
+        A secure temporary password will be generated automatically and emailed to this person — they'll be asked to change it and verify their email the first time they sign in.
+      </p>
+      <p id="admin-limit-note" style="display:none;font-size:0.8125rem;color:var(--foreground-muted);margin:0 0 var(--space-3)">
+        Your school can have up to 5 admin accounts (including you). <span id="admin-limit-count"></span>
+      </p>
+      <button type="submit" class="btn btn-primary" id="create-submit">Create user</button>
+    </form>
+  </div>
+</div>
+
+<div class="card fade-in" id="edit-card" style="display:none">
+  <div class="card-header"><h2 class="section-title" style="margin:0" id="edit-card-title">Edit user</h2></div>
+  <div class="card-body">
+    <form id="edit-form">
+      <div class="form-row">
+        <div class="form-group"><label for="e-name">Full name</label><input type="text" id="e-name" required /></div>
+        <div class="form-group"><label for="e-email">Email</label><input type="email" id="e-email" required /></div>
+        <div class="form-group" id="e-class-field" style="display:none">
+          <label for="e-class">Class <span style="color:var(--danger,#dc2626)">*</span></label>
+          <select id="e-class"></select>
+        </div>
+        <div class="form-group" id="e-trade-field" style="display:none">
+          <label for="e-reg">Registration number</label>
+          <input type="text" id="e-reg" />
+        </div>
+      </div>
+      <p style="font-size:0.8125rem;color:var(--foreground-muted);margin:0 0 var(--space-3)">
+        Editing updates this account in place — nothing is deleted, so their history (submissions, notes, applications, etc.) is preserved.
+      </p>
+      <div style="display:flex;gap:var(--space-3)">
+        <button type="submit" class="btn btn-primary" id="edit-submit">Save changes</button>
+        <button type="button" class="btn btn-ghost" id="edit-cancel">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card fade-in">
+  <div class="card-header">
+    <h2 class="section-title" style="margin:0">All users</h2>
+    <select id="role-filter">
+      <option value="">All roles</option>
+      <option value="student">Students</option>
+      <option value="teacher">Teachers</option>
+      <option value="admin">Admins</option>
+    </select>
+  </div>
+  <div class="card-body">
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Joined</th><th></th></tr></thead>
+        <tbody id="users-body"><tr><td colspan="5">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<style>
+  .btn-sm { padding: var(--space-2) var(--space-4); font-size: 0.875rem; }
+  .inline-form { display: flex; gap: var(--space-3); align-items: flex-start; flex-wrap: wrap; }
+</style>
+
+<script type="module">
+  const { get, post, patch, postForm, del } = await import("../assets/js/api.js");
+  const { escapeHtml, formatDate } = await import("../assets/js/utils.js");
+  const { toast, confirmDialog } = await import("../assets/js/alerts.js");
+  const { getUser } = await import("../assets/js/auth.js");
+
+  const me = getUser();
+  const body = document.getElementById("users-body");
+  const filter = document.getElementById("role-filter");
+  const createCard = document.getElementById("create-card");
+  const roleSelect = document.getElementById("u-role");
+  const classField = document.getElementById("class-field");
+  const classSelect = document.getElementById("u-class");
+  let allUsers = [];
+  let allClasses = [];
+
+  document.getElementById("toggle-create").addEventListener("click", () => {
+    createCard.style.display = createCard.style.display === "none" ? "block" : "none";
+  });
+  document.getElementById("toggle-bulk").addEventListener("click", () => {
+    const bulkCard = document.getElementById("bulk-card");
+    bulkCard.style.display = bulkCard.style.display === "none" ? "block" : "none";
+  });
+  roleSelect.addEventListener("change", () => {
+    const isStudent = roleSelect.value === "student";
+    classField.style.display = isStudent ? "block" : "none";
+    classSelect.required = isStudent;
+    if (!isStudent) classSelect.value = "";
+    const note = document.getElementById("admin-limit-note");
+    if (roleSelect.value === "admin") {
+      const currentAdmins = allUsers.filter((u) => u.role === "admin").length;
+      document.getElementById("admin-limit-count").textContent = `(currently ${currentAdmins}/5)`;
+      note.style.display = "block";
+    } else {
+      note.style.display = "none";
+    }
+  });
+
+  function render() {
+    const f = filter.value;
+    const rows = allUsers.filter((u) => !f || u.role === f);
+    body.innerHTML = rows.length
+      ? rows.map((u) => `<tr>
+          <td data-label="Name"><strong>${escapeHtml(u.fullname)}</strong></td>
+          <td data-label="Email">${escapeHtml(u.email)}</td>
+          <td data-label="Role"><span class="badge">${escapeHtml(u.role)}</span></td>
+          <td data-label="Joined">${formatDate(u.created_at)}</td>
+          <td style="display:flex;gap:var(--space-2)">
+            <button class="btn btn-ghost btn-sm edit-btn" data-id="${u.id}">Edit</button>
+            ${u.id === me.id ? "" : `<button class="btn btn-danger btn-sm delete-btn" data-id="${u.id}">Delete</button>`}
+          </td>
+        </tr>`).join("")
+      : `<tr><td colspan="5"><div class="empty-state"><h3>No users</h3></div></td></tr>`;
+
+    body.querySelectorAll(".edit-btn").forEach((btn) => btn.addEventListener("click", () => openEdit(btn.dataset.id)));
+
+    body.querySelectorAll(".delete-btn").forEach((btn) => btn.addEventListener("click", () => {
+      confirmDialog({
+        title: "Delete user",
+        message: "This will permanently remove this account. Continue?",
+        confirmText: "Delete",
+        onConfirm: async () => {
+          try {
+            await del(`/admin/users/${btn.dataset.id}`);
+            toast("User deleted", "success");
+            allUsers = await get("/admin/users");
+            render();
+          } catch (err) {
+            toast(err.message || "Delete failed", "error");
+          }
+        },
+      });
+    }));
+  }
+
+  try {
+    allUsers = await get("/admin/users");
+    render();
+  } catch (err) {
+    body.innerHTML = `<tr><td colspan="5">${err.message}</td></tr>`;
+  }
+
+  try {
+    const classes = await get("/admin/classes");
+    allClasses = classes;
+    classSelect.innerHTML = `<option value="">Select a class</option>` + classes.map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join("");
+  } catch {}
+
+  filter.addEventListener("change", render);
+
+  document.getElementById("bulk-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const fileInput = document.getElementById("bulk-file");
+    const resultsEl = document.getElementById("bulk-results");
+    if (!fileInput.files.length) return;
+    const btn = document.getElementById("bulk-submit");
+    btn.disabled = true;
+    btn.textContent = "Importing…";
+    resultsEl.innerHTML = "";
+    try {
+      const fd = new FormData();
+      fd.append("file", fileInput.files[0]);
+      fd.append("role", document.getElementById("bulk-role").value);
+      const r = await postForm("/admin/bulk-import", fd);
+      toast(`Imported ${r.created.length} account(s)`, "success");
+      const createdRows = r.created.map((u) => `<tr><td data-label="Name">${escapeHtml(u.fullname)}</td><td data-label="Email">${escapeHtml(u.email)}</td><td data-label="Welcome email">${u.emailed ? "✅ Sent" : "⚠️ Failed to send — share credentials manually"}</td></tr>`).join("");
+      const skippedNote = r.skipped.length ? `<p style="color:var(--warning);margin-top:var(--space-3)">${r.skipped.length} row(s) were skipped (duplicate email or missing fullname/email).</p>` : "";
+      resultsEl.innerHTML = r.created.length ? `
+        <p style="font-size:0.875rem;color:var(--foreground-muted)">Each new account was emailed a secure temporary password automatically.</p>
+        <div class="table-wrap"><table><thead><tr><th>Name</th><th>Email</th><th>Welcome email</th></tr></thead><tbody>${createdRows}</tbody></table></div>
+        ${skippedNote}
+      ` : `<p>No accounts were created. ${skippedNote}</p>`;
+      fileInput.value = "";
+      allUsers = await get("/admin/users");
+      render();
+    } catch (err) {
+      toast(err.message || "Import failed", "error");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Import";
+    }
+  });
+
+  document.getElementById("create-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById("create-submit");
+    const role = roleSelect.value;
+    const payload = {
+      fullname: document.getElementById("u-name").value.trim(),
+      email: document.getElementById("u-email").value.trim(),
+    };
+    if (role === "student") {
+      // Every student account must belong to a class — enforced here as
+      // well as server-side, so this can't be bypassed by disabling JS.
+      if (!classSelect.value) {
+        toast("Please select a class for this student", "error");
+        return;
+      }
+      payload.class_id = classSelect.value;
+    }
+    btn.disabled = true;
+    btn.textContent = "Creating…";
+    try {
+      await post(`/admin/create-${role}`, payload);
+      toast(`${role[0].toUpperCase()}${role.slice(1)} account created — login details emailed to them`, "success");
+      e.target.reset();
+      createCard.style.display = "none";
+      allUsers = await get("/admin/users");
+      render();
+    } catch (err) {
+      toast(err.message || "Failed to create user", "error");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Create user";
+    }
+  });
+
+  // --- Edit-in-place: update an existing account without deleting and
+  // recreating it, so their history (submissions, notes, applications,
+  // etc.) is never lost. ---------------------------------------------
+  const editCard = document.getElementById("edit-card");
+  const editForm = document.getElementById("edit-form");
+  const eClassField = document.getElementById("e-class-field");
+  const eTradeField = document.getElementById("e-trade-field");
+  const eClassSelect = document.getElementById("e-class");
+  let editingUserId = null;
+
+  async function openEdit(id) {
+    try {
+      const u = await get(`/admin/users/${id}`);
+      editingUserId = id;
+      document.getElementById("edit-card-title").textContent = `Edit ${u.role}`;
+      document.getElementById("e-name").value = u.fullname || "";
+      document.getElementById("e-email").value = u.email || "";
+
+      const isStudent = u.role === "student";
+      eClassField.style.display = isStudent ? "block" : "none";
+      eTradeField.style.display = isStudent ? "block" : "none";
+      if (isStudent) {
+        eClassSelect.innerHTML = allClasses.map((c) => `<option value="${c.id}" ${c.id === u.class_id ? "selected" : ""}>${escapeHtml(c.name)}</option>`).join("");
+        document.getElementById("e-reg").value = u.registration_number || "";
+      }
+
+      createCard.style.display = "none";
+      editCard.style.display = "block";
+      editCard.scrollIntoView({ behavior: "smooth", block: "start" });
+    } catch (err) {
+      toast(err.message || "Could not load user", "error");
+    }
+  }
+
+  document.getElementById("edit-cancel").addEventListener("click", () => {
+    editCard.style.display = "none";
+    editingUserId = null;
+  });
+
+  editForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (!editingUserId) return;
+    const btn = document.getElementById("edit-submit");
+    btn.disabled = true;
+    btn.textContent = "Saving…";
+    try {
+      const payload = {
+        fullname: document.getElementById("e-name").value.trim(),
+        email: document.getElementById("e-email").value.trim(),
+      };
+      if (eClassField.style.display !== "none") {
+        if (!eClassSelect.value) {
+          toast("A class is required for students", "error");
+          btn.disabled = false;
+          btn.textContent = "Save changes";
+          return;
+        }
+        payload.class_id = eClassSelect.value;
+        payload.registration_number = document.getElementById("e-reg").value.trim() || null;
+      }
+      await patch(`/admin/users/${editingUserId}`, payload);
+      toast("User updated", "success");
+      editCard.style.display = "none";
+      editingUserId = null;
+      allUsers = await get("/admin/users");
+      render();
+    } catch (err) {
+      toast(err.message || "Update failed", "error");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Save changes";
+    }
+  });
+</script>
