@@ -1,0 +1,144 @@
+<div class="page-header fade-in">
+  <div>
+    <button class="btn btn-ghost btn-sm" id="back-btn">&larr; Back to internships</button>
+    <h1 id="intern-title" style="margin-top:var(--space-2)">Applicants</h1>
+  </div>
+</div>
+
+<div class="card fade-in" id="bulk-card" style="display:none">
+  <div class="card-body bulk-row">
+    <div>
+      <strong>Approve entire class</strong>
+      <p style="margin:0;color:var(--foreground-muted);font-size:0.875rem">Approves every still-pending applicant from the selected class in one action.</p>
+    </div>
+    <div class="bulk-controls">
+      <select id="bulk-class"></select>
+      <button class="btn btn-accent" id="bulk-approve-btn">Approve class</button>
+    </div>
+  </div>
+</div>
+
+<div class="card fade-in" style="margin-top:var(--space-5)">
+  <div class="card-body">
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Student</th><th>Reg. No.</th><th>Class</th><th>Trade</th><th>Applied</th><th>Status</th><th></th></tr></thead>
+        <tbody id="apps-body"><tr><td colspan="7">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<style>
+  .btn-sm { padding: var(--space-2) var(--space-4); font-size: 0.875rem; }
+  .row-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; justify-content: flex-end; }
+  .bulk-row { display: flex; justify-content: space-between; align-items: center; gap: var(--space-4); flex-wrap: wrap; }
+  .bulk-controls { display: flex; gap: var(--space-2); }
+  .bulk-controls select { width: auto; min-width: 180px; }
+</style>
+
+<script type="module">
+  const { get, post } = await import("../../assets/js/api.js");
+  const { escapeHtml, formatDate } = await import("../../assets/js/utils.js");
+  const { toast, confirmDialog } = await import("../../assets/js/alerts.js");
+  const { statusBadge } = await import("../../assets/js/internships.js");
+  const { navigate } = await import("../../assets/js/router.js");
+
+  document.getElementById("back-btn").addEventListener("click", () => navigate("/admin/internships"));
+
+  const id = sessionStorage.getItem("umunara_internship_id");
+  const body = document.getElementById("apps-body");
+  const bulkCard = document.getElementById("bulk-card");
+  const bulkClassSelect = document.getElementById("bulk-class");
+
+  if (!id) {
+    body.innerHTML = `<tr><td colspan="7">No internship selected. Go back and pick one.</td></tr>`;
+  } else {
+    async function load() {
+      try {
+        const [internships, apps] = await Promise.all([
+          get("/admin/internships"),
+          get(`/admin/internships/${id}/applications`),
+        ]);
+        const internship = internships.find((i) => i.id === id);
+        document.getElementById("intern-title").textContent = internship ? `${internship.title} — ${internship.company_name}` : "Applicants";
+
+        const pendingClasses = [...new Map(
+          apps.filter((a) => a.status === "pending_school" && a.class_id).map((a) => [a.class_id, a.class_name])
+        ).entries()];
+        if (pendingClasses.length) {
+          bulkCard.style.display = "";
+          bulkClassSelect.innerHTML = pendingClasses.map(([cid, name]) => `<option value="${cid}">${escapeHtml(name)}</option>`).join("");
+        } else {
+          bulkCard.style.display = "none";
+        }
+
+        body.innerHTML = apps.length
+          ? apps.map((a) => `<tr>
+              <td data-label="Student"><strong>${escapeHtml(a.student_name)}</strong><br><span style="font-size:0.75rem;color:var(--foreground-muted)">${escapeHtml(a.student_email)}</span></td>
+              <td data-label="Reg. No.">${escapeHtml(a.registration_number || "—")}</td>
+              <td data-label="Class">${escapeHtml(a.class_name || "—")}</td>
+              <td data-label="Trade">${escapeHtml(a.trade_name || "—")}</td>
+              <td data-label="Applied">${formatDate(a.applied_at)}</td>
+              <td data-label="Status">${statusBadge(a.status)}</td>
+              <td>
+                <div class="row-actions">
+                  ${a.status === "pending_school" ? `
+                    <button class="btn btn-primary btn-sm approve-btn" data-id="${a.id}">Approve</button>
+                    <button class="btn btn-danger btn-sm reject-btn" data-id="${a.id}">Reject</button>` : ""}
+                  ${a.status === "approved_by_school" ? `<button class="btn btn-accent btn-sm payment-btn" data-id="${a.id}">Mark payment sent</button>` : ""}
+                </div>
+              </td>
+            </tr>`).join("")
+          : `<tr><td colspan="7"><div class="empty-state"><h3>No applicants yet</h3></div></td></tr>`;
+
+        body.querySelectorAll(".approve-btn").forEach((btn) => btn.addEventListener("click", async () => {
+          btn.disabled = true;
+          try { await post(`/admin/applications/${btn.dataset.id}/approve`, {}); toast("Application approved", "success"); load(); }
+          catch (err) { toast(err.message || "Failed", "error"); btn.disabled = false; }
+        }));
+        body.querySelectorAll(".reject-btn").forEach((btn) => btn.addEventListener("click", () => {
+          confirmDialog({
+            title: "Reject application", message: "The student will be notified. Continue?", confirmText: "Reject",
+            onConfirm: async () => {
+              try { await post(`/admin/applications/${btn.dataset.id}/reject`, {}); toast("Application rejected", "success"); load(); }
+              catch (err) { toast(err.message || "Failed", "error"); }
+            },
+          });
+        }));
+        body.querySelectorAll(".payment-btn").forEach((btn) => btn.addEventListener("click", () => {
+          confirmDialog({
+            title: "Mark payment sent",
+            message: "Confirm that your school has sent this student's registration fee to the company directly (outside Umunara).",
+            confirmText: "Mark as sent",
+            onConfirm: async () => {
+              try { await post(`/admin/applications/${btn.dataset.id}/mark-payment-sent`, {}); toast("Marked as sent", "success"); load(); }
+              catch (err) { toast(err.message || "Failed", "error"); }
+            },
+          });
+        }));
+      } catch (err) {
+        body.innerHTML = `<tr><td colspan="7">${err.message}</td></tr>`;
+      }
+    }
+
+    document.getElementById("bulk-approve-btn").addEventListener("click", () => {
+      const classId = bulkClassSelect.value;
+      const className = bulkClassSelect.options[bulkClassSelect.selectedIndex]?.text;
+      confirmDialog({
+        title: "Approve entire class",
+        message: `Approve every pending applicant from "${className}" for this internship?`,
+        confirmText: "Approve class",
+        onConfirm: async () => {
+          try {
+            const r = await post(`/admin/internships/${id}/approve-class`, { class_id: classId });
+            toast(`Approved ${r.approved} application(s)`, "success");
+            load();
+          } catch (err) { toast(err.message || "Failed", "error"); }
+        },
+      });
+    });
+
+    await load();
+  }
+</script>

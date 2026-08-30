@@ -1,0 +1,419 @@
+/* Umunara — Layout System */
+
+.app-shell {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  min-height: 100vh;
+}
+
+.sidebar {
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+}
+
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  border-bottom: 1px solid var(--border);
+}
+
+.sidebar-brand .logo-icon {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: var(--accent-foreground);
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+}
+
+.sidebar-brand .logo-text {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.25rem;
+  letter-spacing: -0.03em;
+}
+
+.sidebar-brand .logo-text span {
+  color: var(--accent);
+}
+
+.sidebar-nav {
+  flex: 1;
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.nav-section {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--foreground-muted);
+  padding: var(--space-3) var(--space-3) var(--space-2);
+}
+
+.nav-link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--foreground-muted);
+  transition: background 0.15s, color 0.15s;
+}
+
+.nav-link:hover {
+  background: var(--border-subtle);
+  color: var(--foreground);
+}
+
+.nav-link.active {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--foreground);
+}
+
+.nav-link svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  flex-shrink: 0;
+}
+
+/* Mobile sidebar backdrop */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgb(0 0 0 / 0.5);
+  z-index: 39;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+body.sidebar-locked {
+  overflow: hidden;
+}
+
+/* Logged-out pages (landing, login) render without the app chrome */
+.app-shell.shell-collapsed {
+  grid-template-columns: 1fr;
+}
+
+.app-shell.shell-collapsed .sidebar,
+.app-shell.shell-collapsed .navbar,
+.app-shell.shell-collapsed .sidebar-overlay {
+  display: none;
+}
+
+.app-shell.shell-collapsed .content {
+  max-width: none;
+  padding: 0;
+}
+
+.sidebar-footer {
+  padding: var(--space-4);
+  border-top: 1px solid var(--border);
+}
+
+.user-mini {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  cursor: pointer;
+  border-radius: var(--radius);
+  padding: var(--space-2);
+  margin: calc(var(--space-2) * -1);
+  transition: background 0.15s;
+}
+
+.user-mini:hover,
+.user-mini:focus-visible {
+  background: var(--surface);
+}
+
+.user-mini .avatar {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 50%;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: 0.875rem;
+}
+
+.user-mini .name {
+  font-weight: 600;
+  font-size: 0.9375rem;
+  line-height: 1.25;
+}
+
+.user-mini .role {
+  font-size: 0.75rem;
+  color: var(--foreground-muted);
+}
+
+.main-wrapper {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.navbar {
+  height: 60px;
+  background: var(--surface-elevated);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--space-6);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.navbar-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-width: 0;
+  flex: 1;
+}
+
+.navbar-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-shrink: 0;
+}
+
+.page-title {
+  font-size: 1.375rem;
+  font-weight: 700;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-box {
+  position: relative;
+}
+
+.search-box input {
+  width: 280px;
+  padding-left: var(--space-10);
+  background: var(--surface);
+}
+
+.search-box svg {
+  position: absolute;
+  left: var(--space-3);
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1.125rem;
+  height: 1.125rem;
+  color: var(--foreground-muted);
+}
+
+.icon-btn {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--foreground);
+  display: grid;
+  place-items: center;
+  transition: background 0.15s;
+}
+
+.icon-btn:hover { background: var(--surface); }
+
+.content {
+  flex: 1;
+  padding: var(--space-6);
+  max-width: 1600px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.footer {
+  border-top: 1px solid var(--border);
+  padding: var(--space-5) var(--space-8);
+  color: var(--foreground-muted);
+  font-size: 0.875rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Dashboard grid */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--space-5);
+  margin-bottom: var(--space-6);
+}
+
+.stat-card {
+  background: var(--surface-elevated);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) + 4px);
+  padding: var(--space-5);
+  box-shadow: var(--shadow-sm);
+}
+
+.stat-label {
+  font-size: 0.875rem;
+  color: var(--foreground-muted);
+  margin-bottom: var(--space-2);
+}
+
+.stat-value {
+  font-size: 2rem;
+  font-weight: 700;
+  font-family: var(--font-display);
+  margin-bottom: var(--space-2);
+}
+
+.stat-delta {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--success);
+}
+
+.stat-delta.negative { color: var(--danger); }
+
+/* Page header */
+.page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-5);
+  margin-bottom: var(--space-6);
+}
+
+/* Dashboards and list pages stack several top-level cards; this gives them
+   a consistent default gap even on a page that forgets to set one
+   in-line, rather than the previous mix of space-6, space-8, or no gap
+   at all between consecutive cards. */
+.content > .dashboard-grid + .card,
+.content > .card + .card {
+  margin-top: var(--space-5);
+}
+
+.page-header p {
+  color: var(--foreground-muted);
+  margin-top: var(--space-1);
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: min(260px, 82vw);
+    transform: translateX(-100%);
+    z-index: 40;
+    transition: transform 0.25s ease;
+    box-shadow: var(--shadow-xl);
+  }
+
+  .sidebar.open { transform: translateX(0); }
+
+  .sidebar-overlay.open {
+    display: block;
+    opacity: 1;
+  }
+
+  .menu-toggle {
+    display: grid;
+    place-items: center;
+  }
+
+  .search-box input { width: 180px; }
+}
+
+@media (min-width: 1025px) {
+  .menu-toggle { display: none; }
+}
+
+@media (max-width: 640px) {
+  .content { padding: var(--space-4); }
+  .navbar { height: 56px; padding: 0 var(--space-4); }
+  .navbar .search-box { display: none; }
+  .page-title { font-size: 1.125rem; }
+  .page-header { flex-direction: column; align-items: stretch; margin-bottom: var(--space-5); gap: var(--space-3); }
+  .page-header > button { width: 100%; }
+  .page-header > div[style*="display:flex"] { flex-wrap: wrap; }
+  .page-header > div[style*="display:flex"] > .btn { flex: 1 1 140px; }
+  .footer { flex-direction: column; gap: var(--space-2); text-align: center; padding: var(--space-4); }
+
+  .sidebar-brand { padding: var(--space-4); }
+  .sidebar-nav { padding: var(--space-2); gap: 2px; }
+  .nav-link { padding: var(--space-2) var(--space-3); }
+  .sidebar-footer { padding: var(--space-3); }
+  .dashboard-grid { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--space-3); margin-bottom: var(--space-5); }
+  .stat-card { padding: var(--space-4); }
+  .stat-value { font-size: 1.5rem; }
+
+  /* Cards are used everywhere on mobile (dashboards, lists, forms) — the
+     desktop space-5/space-6 padding ate a lot of the narrow viewport for
+     no real reason, so every card gets noticeably tighter here. */
+  .card-header, .card-body, .card-footer { padding: var(--space-4); }
+  .section-title { margin-bottom: var(--space-3); }
+}
+
+/* Small phones — tighten padding further so content and the sidebar drawer
+   don't feel cramped or overflow on ~320-400px wide screens. */
+@media (max-width: 400px) {
+  .content { padding: var(--space-3); }
+  .navbar { height: 52px; padding: 0 var(--space-3); }
+  .card-header, .card-body, .card-footer { padding: var(--space-3); }
+  .modal-body, .modal-header, .modal-footer { padding: var(--space-4); }
+  .modal-overlay { padding: var(--space-3); }
+  .sidebar-brand { padding: var(--space-3); }
+  .sidebar-brand .logo-text { font-size: 1.0625rem; }
+  .icon-btn { width: 2.25rem; height: 2.25rem; }
+  .stat-value { font-size: 1.375rem; }
+  th, td { padding: var(--space-2) var(--space-3); }
+}
+
+/* Card/notes/internship grids across the app use minmax() with a fixed
+   pixel floor (240-320px) that's wider than a small phone's content area,
+   which forced a horizontal scroll instead of stacking. Collapse them to a
+   single column below 480px regardless of which page defines them. */
+@media (max-width: 480px) {
+  .intern-grid,
+  .notes-grid,
+  .academics-grid,
+  .quick-links,
+  .company-grid,
+  .l-role-grid,
+  .l-feature-grid,
+  .l-steps,
+  .l-ai-grid,
+  .l-quote-grid {
+    grid-template-columns: 1fr !important;
+  }
+}

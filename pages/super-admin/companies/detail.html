@@ -1,0 +1,432 @@
+<div class="page-header fade-in">
+  <div>
+    <button class="btn btn-ghost btn-sm" id="back-btn">&larr; Back to companies</button>
+  </div>
+</div>
+
+<div id="detail-root" class="fade-in">
+  <div class="empty-state"><h3>Loading…</h3></div>
+</div>
+
+<style>
+  .btn-sm { padding: var(--space-2) var(--space-4); font-size: 0.875rem; }
+  .trade-checks { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+  .trade-check { display: flex; align-items: center; gap: 6px; font-size: 0.8125rem; background: var(--surface); border-radius: 999px; padding: 6px 12px; }
+  .trade-check input { width: auto; }
+  .gallery-strip { display: flex; gap: var(--space-3); flex-wrap: wrap; }
+  .gallery-thumb { width: 90px; height: 90px; border-radius: var(--radius); overflow: hidden; background: var(--surface); }
+  .gallery-thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .danger-zone { border: 1px solid var(--danger, #dc2626); }
+  .danger-zone .section-title { color: var(--danger, #dc2626); }
+  .confirm-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; padding: var(--space-5); z-index: 200; }
+  .confirm-panel { background: var(--background); border-radius: var(--radius); max-width: 440px; width: 100%; }
+  .confirm-panel .card-body { display: flex; flex-direction: column; gap: var(--space-3); }
+</style>
+
+<script type="module">
+  const { get, post, patch, del, delBody } = await import("../../assets/js/api.js");
+  const { escapeHtml, formatDate } = await import("../../assets/js/utils.js");
+  const { toast } = await import("../../assets/js/alerts.js");
+  const { formatRWF, internshipInitials } = await import("../../assets/js/internships.js");
+  const { navigate } = await import("../../assets/js/router.js");
+
+  const root = document.getElementById("detail-root");
+  document.getElementById("back-btn").addEventListener("click", () => navigate("/super-admin/companies"));
+
+  const id = sessionStorage.getItem("umunara_company_id");
+  if (!id) {
+    root.innerHTML = `<div class="empty-state"><h3>No company selected</h3><p>Go back and pick one from the list.</p></div>`;
+  } else {
+    try {
+      const [c, allTrades] = await Promise.all([
+        get(`/super-admin/companies/${id}`),
+        get("/super-admin/trades"),
+      ]);
+      const myTradeIds = new Set((c.trades || []).map((t) => t.id));
+
+      root.innerHTML = `
+        <div class="card">
+          <div class="card-header" style="display:flex;align-items:center;gap:var(--space-3);flex-wrap:wrap">
+            <div style="width:2.5rem;height:2.5rem;border-radius:var(--radius);background:var(--primary);color:var(--primary-foreground);display:grid;place-items:center;font-weight:700;overflow:hidden">${c.logo_url ? `<img src="${escapeHtml(c.logo_url)}" style="width:100%;height:100%;object-fit:cover" />` : internshipInitials(c.name)}</div>
+            <h2 class="section-title" style="margin:0">${escapeHtml(c.name)}</h2>
+            <span class="badge ${c.verified ? "badge-success" : "badge-warning"}" style="margin-left:var(--space-2)">${c.verified ? "Verified" : "Unverified"}</span>
+            <span class="badge ${c.is_active === false ? "badge-danger" : "badge"}">${c.is_active === false ? "Deactivated" : "Active"}</span>
+            <div style="margin-left:auto;display:flex;gap:var(--space-2)">
+              <button class="btn btn-sm ${c.is_active === false ? "btn-primary" : "btn-ghost"}" id="status-btn">${c.is_active === false ? "Activate" : "Deactivate"}</button>
+              <button class="btn btn-sm ${c.verified ? "btn-ghost" : "btn-primary"}" id="verify-btn">${c.verified ? "Unverify" : "Verify"}</button>
+            </div>
+          </div>
+          <div class="card-body">
+            ${c.gallery_images && c.gallery_images.length ? `<div class="gallery-strip" style="margin-bottom:var(--space-5)">${c.gallery_images.map((url) => `<div class="gallery-thumb"><img src="${escapeHtml(url)}" alt="" /></div>`).join("")}</div>` : ""}
+
+            <form id="edit-form" class="form-row">
+              <div class="form-group"><label for="f-name">Company name</label><input type="text" id="f-name" required /></div>
+              <div class="form-group"><label for="f-email">Email</label><input type="email" id="f-email" /></div>
+              <div class="form-group"><label for="f-phone">Phone</label><input type="text" id="f-phone" /></div>
+              <div class="form-group"><label for="f-website">Website</label><input type="text" id="f-website" /></div>
+              <div class="form-group"><label for="f-district">District</label><input type="text" id="f-district" /></div>
+              <div class="form-group"><label for="f-province">Province</label><input type="text" id="f-province" /></div>
+              <div class="form-group"><label for="f-industry">Industry</label><input type="text" id="f-industry" /></div>
+              <div class="form-group"><label for="f-employees">Employee count</label><input type="text" id="f-employees" placeholder="e.g. 11-50" /></div>
+              <div class="form-group"><label for="f-founded">Founded year</label><input type="number" id="f-founded" min="1900" max="2100" /></div>
+              <div class="form-group" style="grid-column:1/-1"><label for="f-address">Address</label><input type="text" id="f-address" /></div>
+              <div class="form-group" style="grid-column:1/-1"><label for="f-description">Description</label><textarea id="f-description" rows="4"></textarea></div>
+              <div class="form-group" style="grid-column:1/-1">
+                <label>Trades offered</label>
+                <div class="trade-checks">
+                  ${allTrades.map((t) => `<label class="trade-check"><input type="checkbox" value="${t.id}" ${myTradeIds.has(t.id) ? "checked" : ""} /> ${escapeHtml(t.name)}</label>`).join("")}
+                </div>
+              </div>
+              <div class="form-group"><button type="submit" class="btn btn-primary" id="save-btn">Save changes</button></div>
+            </form>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:var(--space-6)">
+          <div class="card-header">
+            <div>
+              <h2 class="section-title" style="margin:0">Staff accounts</h2>
+              <p style="margin:2px 0 0;font-size:0.8125rem;color:var(--foreground-muted)">Up to 2 logins can manage this company. Click Edit to fix a name/email in place.</p>
+            </div>
+            <button class="btn btn-accent btn-sm" id="add-staff-btn">Add staff member</button>
+          </div>
+          <div class="card-body">
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Name</th><th>Email</th><th>Joined</th><th></th></tr></thead>
+                <tbody id="staff-body"><tr><td colspan="4">Loading…</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" id="invite-card" style="display:none;margin-top:var(--space-6)">
+          <div class="card-header"><h2 class="section-title" style="margin:0">Add staff member</h2></div>
+          <div class="card-body">
+            <form id="invite-form" class="form-row">
+              <div class="form-group"><label for="st-name">Full name</label><input type="text" id="st-name" required /></div>
+              <div class="form-group"><label for="st-email">Email</label><input type="email" id="st-email" required /></div>
+              <div class="form-group"><button type="submit" class="btn btn-primary" id="invite-submit">Send invite</button></div>
+            </form>
+            <p style="font-size:0.8125rem;color:var(--foreground-muted);margin:0">A secure temporary password will be generated automatically and emailed to them.</p>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:var(--space-6)">
+          <div class="card-header"><h2 class="section-title" style="margin:0">Internships (${c.internships.length})</h2></div>
+          <div class="card-body">
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Title</th><th>Trade</th><th>Positions</th><th>Status</th></tr></thead>
+                <tbody>
+                  ${c.internships.length
+                    ? c.internships.map((i) => `<tr>
+                        <td data-label="Title"><strong>${escapeHtml(i.title)}</strong></td>
+                        <td data-label="Trade">${escapeHtml(i.trade_name || "Any")}</td>
+                        <td data-label="Positions">${i.positions_available} / ${i.positions_total}</td>
+                        <td data-label="Status"><span class="badge ${i.status === "open" ? "badge-success" : i.status === "full" ? "badge-warning" : "badge"}">${escapeHtml(i.status)}</span></td>
+                      </tr>`).join("")
+                    : `<tr><td colspan="4"><div class="empty-state"><h3>No internships yet</h3></div></td></tr>`}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="card danger-zone" style="margin-top:var(--space-6)">
+          <div class="card-header"><h2 class="section-title" style="margin:0">Danger zone</h2></div>
+          <div class="card-body">
+            <p>Deleting this company removes it, all of its internship postings, and its staff logins. This cannot be undone.</p>
+            <button class="btn btn-danger" id="delete-company-btn">Delete company</button>
+          </div>
+        </div>`;
+
+      document.getElementById("f-name").value = c.name || "";
+      document.getElementById("f-email").value = c.email || "";
+      document.getElementById("f-phone").value = c.phone || "";
+      document.getElementById("f-website").value = c.website || "";
+      document.getElementById("f-district").value = c.district || "";
+      document.getElementById("f-province").value = c.province || "";
+      document.getElementById("f-industry").value = c.industry || "";
+      document.getElementById("f-employees").value = c.employee_count || "";
+      document.getElementById("f-founded").value = c.founded_year || "";
+      document.getElementById("f-address").value = c.address || "";
+      document.getElementById("f-description").value = c.description || "";
+
+      let currentVerified = c.verified;
+      document.getElementById("verify-btn").addEventListener("click", async (e) => {
+        const btn = e.target;
+        btn.disabled = true;
+        try {
+          await patch(`/super-admin/companies/${id}/verify`, { verified: !currentVerified });
+          toast("Verification updated", "success");
+          navigate("/super-admin/companies/detail");
+        } catch (err) {
+          toast(err.message || "Failed", "error");
+          btn.disabled = false;
+        }
+      });
+
+      let currentActive = c.is_active !== false;
+      document.getElementById("status-btn").addEventListener("click", async (e) => {
+        const btn = e.target;
+        btn.disabled = true;
+        try {
+          await patch(`/super-admin/companies/${id}/status`, { is_active: !currentActive });
+          toast(currentActive ? "Company deactivated — logins are now blocked" : "Company activated", "success");
+          navigate("/super-admin/companies/detail");
+        } catch (err) {
+          toast(err.message || "Failed", "error");
+          btn.disabled = false;
+        }
+      });
+
+      // --- Staff accounts ------------------------------------------------
+      const staffBody = document.getElementById("staff-body");
+      const inviteCard = document.getElementById("invite-card");
+      const addStaffBtn = document.getElementById("add-staff-btn");
+
+      async function loadStaff() {
+        try {
+          const staff = await get(`/super-admin/companies/${id}/staff`);
+          staffBody.innerHTML = staff.length
+            ? staff.map((s) => `<tr data-staff-id="${s.id}">
+                <td data-label="Name" class="staff-name">${escapeHtml(s.fullname)}</td>
+                <td data-label="Email" class="staff-email">${escapeHtml(s.email)}</td>
+                <td data-label="Joined">${formatDate(s.created_at)}</td>
+                <td style="display:flex;gap:var(--space-2)">
+                  <button class="btn btn-ghost btn-sm edit-staff-btn" data-id="${s.id}" data-name="${escapeHtml(s.fullname)}" data-email="${escapeHtml(s.email)}">Edit</button>
+                  <button class="btn btn-danger btn-sm remove-staff-btn" data-id="${s.id}">Remove</button>
+                </td>
+              </tr>`).join("")
+            : `<tr><td colspan="4"><div class="empty-state"><h3>No staff yet</h3></div></td></tr>`;
+
+          addStaffBtn.disabled = staff.length >= 2;
+          addStaffBtn.title = staff.length >= 2 ? "This company already has 2 staff accounts" : "";
+
+          staffBody.querySelectorAll(".edit-staff-btn").forEach((btn) => btn.addEventListener("click", () => {
+            openEditUser({
+              id: btn.dataset.id,
+              name: btn.dataset.name,
+              email: btn.dataset.email,
+              onSaved: (updated) => {
+                const row = staffBody.querySelector(`tr[data-staff-id="${btn.dataset.id}"]`);
+                if (row) {
+                  row.querySelector(".staff-name").textContent = updated.fullname;
+                  row.querySelector(".staff-email").textContent = updated.email;
+                  btn.dataset.name = updated.fullname;
+                  btn.dataset.email = updated.email;
+                }
+              },
+            });
+          }));
+
+          staffBody.querySelectorAll(".remove-staff-btn").forEach((btn) => btn.addEventListener("click", () => {
+            openDeleteConfirmSimple({
+              message: "Remove this staff member's access to the company dashboard?",
+              onConfirm: async () => {
+                await del(`/super-admin/companies/${id}/staff/${btn.dataset.id}`);
+                toast("Staff member removed", "success");
+                loadStaff();
+              },
+            });
+          }));
+        } catch (err) {
+          staffBody.innerHTML = `<tr><td colspan="4">${err.message}</td></tr>`;
+        }
+      }
+      await loadStaff();
+
+      addStaffBtn.addEventListener("click", () => {
+        inviteCard.style.display = inviteCard.style.display === "none" ? "block" : "none";
+      });
+
+      document.getElementById("invite-form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const btn = document.getElementById("invite-submit");
+        btn.disabled = true;
+        btn.textContent = "Sending…";
+        try {
+          await post(`/super-admin/companies/${id}/staff`, {
+            fullname: document.getElementById("st-name").value.trim(),
+            email: document.getElementById("st-email").value.trim(),
+          });
+          toast("Staff account created — login details emailed to them", "success");
+          e.target.reset();
+          inviteCard.style.display = "none";
+          loadStaff();
+        } catch (err) {
+          toast(err.message || "Could not add staff member", "error");
+        } finally {
+          btn.disabled = false;
+          btn.textContent = "Send invite";
+        }
+      });
+
+      document.getElementById("edit-form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const btn = document.getElementById("save-btn");
+        btn.disabled = true;
+        btn.textContent = "Saving…";
+        try {
+          const tradeIds = Array.from(document.querySelectorAll(".trade-check input:checked")).map((el) => el.value);
+          await patch(`/super-admin/companies/${id}`, {
+            name: document.getElementById("f-name").value.trim(),
+            email: document.getElementById("f-email").value.trim() || null,
+            phone: document.getElementById("f-phone").value.trim() || null,
+            website: document.getElementById("f-website").value.trim() || null,
+            district: document.getElementById("f-district").value.trim() || null,
+            province: document.getElementById("f-province").value.trim() || null,
+            industry: document.getElementById("f-industry").value.trim() || null,
+            employee_count: document.getElementById("f-employees").value.trim() || null,
+            founded_year: document.getElementById("f-founded").value || null,
+            address: document.getElementById("f-address").value.trim() || null,
+            description: document.getElementById("f-description").value.trim() || null,
+            trade_ids: tradeIds,
+          });
+          toast("Company updated", "success");
+        } catch (err) {
+          toast(err.message || "Update failed", "error");
+        } finally {
+          btn.disabled = false;
+          btn.textContent = "Save changes";
+        }
+      });
+      document.getElementById("delete-company-btn").addEventListener("click", () => {
+        openDeleteConfirm({
+          entityLabel: "company",
+          name: c.name,
+          onConfirm: async (typedName) => {
+            await delBody(`/super-admin/companies/${id}`, { confirmation: typedName });
+            toast("Company deleted", "success");
+            navigate("/super-admin/companies");
+          },
+        });
+      });
+    } catch (err) {
+      root.innerHTML = `<div class="empty-state"><h3>Couldn't load company</h3><p>${err.message}</p></div>`;
+    }
+  }
+
+  // Shared "edit user in place" modal — updates a staff account's
+  // name/email via the super-admin-wide PATCH /super-admin/users/:id
+  // endpoint, preserving the account's history instead of delete+recreate.
+  function openEditUser({ id, name, email, onSaved }) {
+    const modalRoot = document.getElementById("modal-root") || document.body;
+    const overlay = document.createElement("div");
+    overlay.className = "confirm-backdrop";
+    overlay.innerHTML = `
+      <div class="card confirm-panel">
+        <div class="card-header"><h2 class="section-title" style="margin:0">Edit account</h2></div>
+        <div class="card-body">
+          <div class="form-group"><label for="eu-name">Full name</label><input type="text" id="eu-name" /></div>
+          <div class="form-group"><label for="eu-email">Email</label><input type="email" id="eu-email" /></div>
+          <div style="display:flex;gap:var(--space-3);justify-content:flex-end">
+            <button class="btn btn-ghost" id="eu-cancel">Cancel</button>
+            <button class="btn btn-primary" id="eu-save">Save changes</button>
+          </div>
+        </div>
+      </div>`;
+    modalRoot.appendChild(overlay);
+
+    overlay.querySelector("#eu-name").value = name || "";
+    overlay.querySelector("#eu-email").value = email || "";
+    overlay.querySelector("#eu-cancel").addEventListener("click", () => overlay.remove());
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
+
+    overlay.querySelector("#eu-save").addEventListener("click", async () => {
+      const saveBtn = overlay.querySelector("#eu-save");
+      saveBtn.disabled = true;
+      saveBtn.textContent = "Saving…";
+      try {
+        const updated = await patch(`/super-admin/users/${id}`, {
+          fullname: overlay.querySelector("#eu-name").value.trim(),
+          email: overlay.querySelector("#eu-email").value.trim(),
+        });
+        toast("Account updated", "success");
+        onSaved(updated);
+        overlay.remove();
+      } catch (err) {
+        toast(err.message || "Update failed", "error");
+        saveBtn.disabled = false;
+        saveBtn.textContent = "Save changes";
+      }
+    });
+  }
+
+  // Lightweight confirm (no re-type-the-name requirement) for the
+  // lower-stakes "remove one staff login" action.
+  function openDeleteConfirmSimple({ message, onConfirm }) {
+    const modalRoot = document.getElementById("modal-root") || document.body;
+    const overlay = document.createElement("div");
+    overlay.className = "confirm-backdrop";
+    overlay.innerHTML = `
+      <div class="card confirm-panel">
+        <div class="card-header"><h2 class="section-title" style="margin:0">Are you sure?</h2></div>
+        <div class="card-body">
+          <p>${escapeHtml(message)}</p>
+          <div style="display:flex;gap:var(--space-3);justify-content:flex-end">
+            <button class="btn btn-ghost" id="sc-cancel">Cancel</button>
+            <button class="btn btn-danger" id="sc-confirm">Remove</button>
+          </div>
+        </div>
+      </div>`;
+    modalRoot.appendChild(overlay);
+    overlay.querySelector("#sc-cancel").addEventListener("click", () => overlay.remove());
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
+    overlay.querySelector("#sc-confirm").addEventListener("click", async () => {
+      const btn = overlay.querySelector("#sc-confirm");
+      btn.disabled = true;
+      btn.textContent = "Removing…";
+      try {
+        await onConfirm();
+        overlay.remove();
+      } catch (err) {
+        toast(err.message || "Failed", "error");
+        btn.disabled = false;
+        btn.textContent = "Remove";
+      }
+    });
+  }
+
+  // Shared guarded-delete confirmation: the exact name must be re-typed
+  // (paste is disabled) before the Delete button is enabled at all — a
+  // deliberate extra step so this can't be triggered by an accidental click.
+  function openDeleteConfirm({ entityLabel, name, onConfirm }) {
+    const modalRoot = document.getElementById("modal-root") || document.body;
+    const overlay = document.createElement("div");
+    overlay.className = "confirm-backdrop";
+    overlay.innerHTML = `
+      <div class="card confirm-panel">
+        <div class="card-header"><h2 class="section-title" style="margin:0">Delete ${entityLabel}</h2></div>
+        <div class="card-body">
+          <p>This cannot be undone. Type <strong>${escapeHtml(name)}</strong> below to confirm.</p>
+          <input type="text" id="confirm-input" autocomplete="off" placeholder="Type the ${entityLabel} name" />
+          <div style="display:flex;gap:var(--space-3);justify-content:flex-end">
+            <button class="btn btn-ghost" id="confirm-cancel">Cancel</button>
+            <button class="btn btn-danger" id="confirm-delete" disabled>Delete ${entityLabel}</button>
+          </div>
+        </div>
+      </div>`;
+    modalRoot.appendChild(overlay);
+
+    const input = overlay.querySelector("#confirm-input");
+    const deleteBtn = overlay.querySelector("#confirm-delete");
+    input.addEventListener("paste", (e) => e.preventDefault());
+    input.addEventListener("input", () => { deleteBtn.disabled = input.value !== name; });
+    overlay.querySelector("#confirm-cancel").addEventListener("click", () => overlay.remove());
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
+    deleteBtn.addEventListener("click", async () => {
+      deleteBtn.disabled = true;
+      deleteBtn.textContent = "Deleting…";
+      try {
+        await onConfirm(input.value);
+        overlay.remove();
+      } catch (err) {
+        toast(err.message || "Delete failed", "error");
+        deleteBtn.disabled = false;
+        deleteBtn.textContent = `Delete ${entityLabel}`;
+      }
+    });
+  }
+</script>

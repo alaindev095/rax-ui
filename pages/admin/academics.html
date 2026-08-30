@@ -1,0 +1,369 @@
+<div class="page-header fade-in">
+  <div>
+    <h1>Academics</h1>
+    <p>Create classes and subjects, and assign subjects to teachers.</p>
+  </div>
+</div>
+
+<div class="academics-grid fade-in">
+  <div class="card">
+    <div class="card-header">
+      <h2 class="section-title" style="margin:0">Classes</h2>
+    </div>
+    <div class="card-body">
+      <form id="class-form" class="inline-form">
+        <div class="form-group" style="margin-bottom:0;flex:1">
+          <label for="class-name" class="sr-only">Class name</label>
+          <input type="text" id="class-name" placeholder="e.g. Senior 4 MCB" required />
+        </div>
+        <button type="submit" class="btn btn-primary" id="class-submit">Add class</button>
+      </form>
+
+      <div class="table-wrap" style="margin-top:var(--space-5)">
+        <table>
+          <thead><tr><th>Name</th><th></th></tr></thead>
+          <tbody id="classes-body"><tr><td colspan="2">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h2 class="section-title" style="margin:0">Subjects</h2>
+    </div>
+    <div class="card-body">
+      <form id="subject-form" class="inline-form">
+        <div class="form-group" style="margin-bottom:0;flex:1">
+          <label for="subject-name" class="sr-only">Subject name</label>
+          <input type="text" id="subject-name" placeholder="e.g. Mathematics" required />
+        </div>
+        <button type="submit" class="btn btn-primary" id="subject-submit">Add subject</button>
+      </form>
+
+      <div class="table-wrap" style="margin-top:var(--space-5)">
+        <table>
+          <thead><tr><th>Name</th><th></th></tr></thead>
+          <tbody id="subjects-body"><tr><td colspan="2">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header">
+      <h2 class="section-title" style="margin:0">Trades</h2>
+    </div>
+    <div class="card-body">
+      <p style="color:var(--foreground-muted);margin-top:0;font-size:0.875rem">Used for internships and student profiles (TVET trade / programme). Managed by the Umunara super-admin team — ask them to add or remove a trade.</p>
+
+      <div class="table-wrap" style="margin-top:var(--space-5)">
+        <table>
+          <thead><tr><th>Name</th></tr></thead>
+          <tbody id="trades-body"><tr><td>Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card fade-in" style="margin-top:var(--space-6)">
+  <div class="card-header">
+    <h2 class="section-title" style="margin:0">Assign subjects to teachers</h2>
+  </div>
+  <div class="card-body">
+    <form id="assign-form" class="form-row" style="align-items:end">
+      <div class="form-group">
+        <label for="assign-teacher">Teacher</label>
+        <select id="assign-teacher" required><option value="">Select teacher…</option></select>
+      </div>
+      <div class="form-group">
+        <label for="assign-subject">Subject</label>
+        <select id="assign-subject" required><option value="">Select subject…</option></select>
+      </div>
+      <div class="form-group" style="margin-bottom:var(--space-5)">
+        <button type="submit" class="btn btn-accent" id="assign-submit">Assign</button>
+      </div>
+    </form>
+
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Teacher</th><th>Subject</th><th></th></tr></thead>
+        <tbody id="assignments-body"><tr><td colspan="3">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<style>
+  .academics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: var(--space-6);
+  }
+  .inline-form {
+    display: flex;
+    gap: var(--space-3);
+    align-items: flex-start;
+  }
+  .row-actions {
+    display: flex;
+    gap: var(--space-2);
+    justify-content: flex-end;
+    flex-wrap: wrap;
+  }
+  .name-edit-input {
+    padding: var(--space-2) var(--space-3);
+    font-size: 0.9375rem;
+  }
+</style>
+
+<script type="module">
+  const { get, post, patch, del } = await import("../assets/js/api.js");
+  const { escapeHtml } = await import("../assets/js/utils.js");
+  const { toast, confirmDialog } = await import("../assets/js/alerts.js");
+
+  const classesBody = document.getElementById("classes-body");
+  const subjectsBody = document.getElementById("subjects-body");
+  const tradesBody = document.getElementById("trades-body");
+  const assignmentsBody = document.getElementById("assignments-body");
+  const teacherSelect = document.getElementById("assign-teacher");
+  const subjectSelect = document.getElementById("assign-subject");
+
+  let classes = [];
+  let subjects = [];
+  let trades = [];
+  let teachers = [];
+  let assignments = [];
+
+  function renderClasses() {
+    classesBody.innerHTML = classes.length
+      ? classes.map((c) => `
+        <tr data-id="${c.id}">
+          <td data-label="Name">
+            <span class="view-name">${escapeHtml(c.name)}</span>
+            <input class="edit-name name-edit-input" style="display:none" value="${escapeHtml(c.name)}" />
+          </td>
+          <td>
+            <div class="row-actions">
+              <button class="btn btn-ghost btn-sm edit-btn">Edit</button>
+              <button class="btn btn-ghost btn-sm save-btn" style="display:none">Save</button>
+              <button class="btn btn-danger btn-sm delete-btn">Delete</button>
+            </div>
+          </td>
+        </tr>`).join("")
+      : `<tr><td colspan="2"><div class="empty-state"><h3>No classes yet</h3><p>Add your first class above.</p></div></td></tr>`;
+    bindRowActions(classesBody, "classes", (id, name) => patch(`/admin/classes/${id}`, { name }), (id) => del(`/admin/classes/${id}`));
+  }
+
+  function renderSubjects() {
+    subjectsBody.innerHTML = subjects.length
+      ? subjects.map((s) => `
+        <tr data-id="${s.id}">
+          <td data-label="Name">
+            <span class="view-name">${escapeHtml(s.name)}</span>
+            <input class="edit-name name-edit-input" style="display:none" value="${escapeHtml(s.name)}" />
+          </td>
+          <td>
+            <div class="row-actions">
+              <button class="btn btn-ghost btn-sm edit-btn">Edit</button>
+              <button class="btn btn-ghost btn-sm save-btn" style="display:none">Save</button>
+              <button class="btn btn-danger btn-sm delete-btn">Delete</button>
+            </div>
+          </td>
+        </tr>`).join("")
+      : `<tr><td colspan="2"><div class="empty-state"><h3>No subjects yet</h3><p>Add your first subject above.</p></div></td></tr>`;
+    bindRowActions(subjectsBody, "subjects", (id, name) => patch(`/admin/subjects/${id}`, { name }), (id) => del(`/admin/subjects/${id}`));
+  }
+
+  // Read-only: trades are created/deleted by the Umunara super-admin team
+  // only now, so this list has no edit/delete controls (see the note above
+  // the table in the markup).
+  function renderTrades() {
+    tradesBody.innerHTML = trades.length
+      ? trades.map((t) => `
+        <tr data-id="${t.id}">
+          <td data-label="Name">${escapeHtml(t.name)}</td>
+        </tr>`).join("")
+      : `<tr><td><div class="empty-state"><h3>No trades yet</h3><p>Ask the Umunara super-admin team to add some.</p></div></td></tr>`;
+  }
+
+  function bindRowActions(body, label, onSave, onDelete) {
+    body.querySelectorAll("tr[data-id]").forEach((row) => {
+      const id = row.dataset.id;
+      const viewName = row.querySelector(".view-name");
+      const editInput = row.querySelector(".edit-name");
+      const editBtn = row.querySelector(".edit-btn");
+      const saveBtn = row.querySelector(".save-btn");
+      const deleteBtn = row.querySelector(".delete-btn");
+
+      editBtn.addEventListener("click", () => {
+        viewName.style.display = "none";
+        editInput.style.display = "inline-block";
+        editBtn.style.display = "none";
+        saveBtn.style.display = "inline-flex";
+        editInput.focus();
+      });
+
+      saveBtn.addEventListener("click", async () => {
+        const name = editInput.value.trim();
+        if (!name) return toast("Name is required", "error");
+        saveBtn.disabled = true;
+        try {
+          await onSave(id, name);
+          toast("Saved", "success");
+          await refreshAll();
+        } catch (err) {
+          toast(err.message || "Update failed", "error");
+          saveBtn.disabled = false;
+        }
+      });
+
+      deleteBtn.addEventListener("click", () => {
+        confirmDialog({
+          title: `Delete ${label === "classes" ? "class" : "subject"}`,
+          message: "This cannot be undone. Continue?",
+          confirmText: "Delete",
+          onConfirm: async () => {
+            try {
+              await onDelete(id);
+              toast("Deleted", "success");
+              await refreshAll();
+            } catch (err) {
+              toast(err.message || "Delete failed", "error");
+            }
+          },
+        });
+      });
+    });
+  }
+
+  function renderAssignments() {
+    assignmentsBody.innerHTML = assignments.length
+      ? assignments.map((a) => `
+        <tr>
+          <td data-label="Teacher"><strong>${escapeHtml(a.teacher_name)}</strong></td>
+          <td data-label="Subject"><span class="badge badge-info">${escapeHtml(a.subject_name)}</span></td>
+          <td><button class="btn btn-danger btn-sm unassign-btn" data-id="${a.id}">Remove</button></td>
+        </tr>`).join("")
+      : `<tr><td colspan="3"><div class="empty-state"><h3>No assignments yet</h3><p>Assign a subject to a teacher above.</p></div></td></tr>`;
+
+    assignmentsBody.querySelectorAll(".unassign-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        confirmDialog({
+          title: "Remove assignment",
+          message: "This teacher will no longer be assigned this subject. Continue?",
+          confirmText: "Remove",
+          onConfirm: async () => {
+            try {
+              await del(`/admin/teacher-subject/${btn.dataset.id}`);
+              toast("Assignment removed", "success");
+              await refreshAssignments();
+            } catch (err) {
+              toast(err.message || "Failed to remove", "error");
+            }
+          },
+        });
+      });
+    });
+  }
+
+  function renderSelects() {
+    teacherSelect.innerHTML = `<option value="">Select teacher…</option>` +
+      teachers.map((t) => `<option value="${t.id}">${escapeHtml(t.fullname)}</option>`).join("");
+    subjectSelect.innerHTML = `<option value="">Select subject…</option>` +
+      subjects.map((s) => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join("");
+  }
+
+  async function refreshAssignments() {
+    assignments = await get("/admin/teacher-subjects");
+    renderAssignments();
+  }
+
+  async function refreshAll() {
+    [classes, subjects, trades, teachers, assignments] = await Promise.all([
+      get("/admin/classes"),
+      get("/admin/subjects"),
+      get("/admin/trades"),
+      get("/admin/teachers"),
+      get("/admin/teacher-subjects"),
+    ]);
+    renderClasses();
+    renderSubjects();
+    renderTrades();
+    renderAssignments();
+    renderSelects();
+  }
+
+  try {
+    await refreshAll();
+  } catch (err) {
+    toast(err.message || "Failed to load academics data", "error");
+  }
+
+  document.getElementById("class-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const input = document.getElementById("class-name");
+    const btn = document.getElementById("class-submit");
+    const name = input.value.trim();
+    if (!name) return;
+    btn.disabled = true;
+    btn.textContent = "Adding…";
+    try {
+      await post("/admin/create-class", { name });
+      toast("Class added", "success");
+      input.value = "";
+      classes = await get("/admin/classes");
+      renderClasses();
+    } catch (err) {
+      toast(err.message || "Failed to add class", "error");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Add class";
+    }
+  });
+
+  document.getElementById("subject-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const input = document.getElementById("subject-name");
+    const btn = document.getElementById("subject-submit");
+    const name = input.value.trim();
+    if (!name) return;
+    btn.disabled = true;
+    btn.textContent = "Adding…";
+    try {
+      await post("/admin/create-subject", { name });
+      toast("Subject added", "success");
+      input.value = "";
+      subjects = await get("/admin/subjects");
+      renderSubjects();
+      renderSelects();
+    } catch (err) {
+      toast(err.message || "Failed to add subject", "error");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Add subject";
+    }
+  });
+
+  document.getElementById("assign-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById("assign-submit");
+    const teacher_id = teacherSelect.value;
+    const subject_id = subjectSelect.value;
+    if (!teacher_id || !subject_id) return toast("Select a teacher and a subject", "error");
+    btn.disabled = true;
+    btn.textContent = "Assigning…";
+    try {
+      await post("/admin/assign-subject", { teacher_id, subject_id });
+      toast("Subject assigned", "success");
+      teacherSelect.value = "";
+      subjectSelect.value = "";
+      await refreshAssignments();
+    } catch (err) {
+      toast(err.message || "Failed to assign subject", "error");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Assign";
+    }
+  });
+</script>

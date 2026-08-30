@@ -1,0 +1,55 @@
+<div class="page-header fade-in">
+  <div>
+    <h1>Super Admin Dashboard</h1>
+    <p>Platform-wide overview across every school and company.</p>
+  </div>
+</div>
+
+<div class="dashboard-grid fade-in" id="stats-grid">
+  <div class="card stat-card"><div class="card-body"><span class="stat-label">Schools</span><span class="stat-value skeleton" style="width:3rem;height:1.75rem"></span></div></div>
+</div>
+
+<div class="quick-links fade-in">
+  <button class="card quick-link-card" data-nav="/super-admin/schools">
+    <div class="card-body">
+      <h3>Create a school</h3>
+      <p>Set up a new school and its first admin account.</p>
+    </div>
+  </button>
+  <button class="card quick-link-card" data-nav="/super-admin/companies">
+    <div class="card-body">
+      <h3>Create a company</h3>
+      <p>Onboard a new internship company and its first login.</p>
+    </div>
+  </button>
+</div>
+
+<style>
+  .stat-card .card-body { display: flex; flex-direction: column; gap: var(--space-1); }
+  .stat-label { font-size: 0.8125rem; color: var(--foreground-muted); }
+  .stat-value { font-size: 1.75rem; font-weight: 700; }
+  .quick-links { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--space-5); margin-top: var(--space-6); }
+  .quick-link-card { text-align: left; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s; }
+  .quick-link-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+  .quick-link-card h3 { margin: 0 0 var(--space-1); font-size: 1.0625rem; }
+  .quick-link-card p { margin: 0; color: var(--foreground-muted); font-size: 0.875rem; }
+</style>
+
+<script type="module">
+  const { get } = await import("../assets/js/api.js");
+
+  function statCard(label, value) {
+    return `<div class="card stat-card"><div class="card-body"><span class="stat-label">${label}</span><span class="stat-value">${value}</span></div></div>`;
+  }
+
+  try {
+    const s = await get("/super-admin/stats");
+    document.getElementById("stats-grid").innerHTML = [
+      statCard("Schools", s.total_schools),
+      statCard("School admins", s.total_school_admins),
+      statCard("Teachers", s.total_teachers),
+      statCard("Students", s.total_students),
+      statCard("Companies", s.total_companies),
+    ].join("");
+  } catch { /* stats are non-critical */ }
+</script>

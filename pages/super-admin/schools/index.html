@@ -1,0 +1,136 @@
+<div class="page-header fade-in">
+  <div>
+    <h1>Schools</h1>
+    <p>Create a new school and its first admin account. Click a school to view and edit its details.</p>
+  </div>
+  <button class="btn btn-accent" id="toggle-create">Add school</button>
+</div>
+
+<div class="card fade-in" id="create-card" style="display:none">
+  <div class="card-header"><h2 class="section-title" style="margin:0">New school</h2></div>
+  <div class="card-body">
+    <form id="create-form">
+      <h3 class="form-subheading">School details</h3>
+      <div class="form-row">
+        <div class="form-group"><label for="s-name">School name</label><input type="text" id="s-name" required /></div>
+        <div class="form-group"><label for="s-district">District</label><input type="text" id="s-district" /></div>
+        <div class="form-group"><label for="s-province">Province</label><input type="text" id="s-province" /></div>
+        <div class="form-group"><label for="s-phone">Phone</label><input type="text" id="s-phone" /></div>
+        <div class="form-group"><label for="s-email">School email</label><input type="email" id="s-email" /></div>
+        <div class="form-group" style="grid-column:1/-1"><label for="s-address">Address</label><input type="text" id="s-address" /></div>
+      </div>
+
+      <h3 class="form-subheading">First school-admin account</h3>
+      <div class="form-row">
+        <div class="form-group"><label for="a-name">Admin full name</label><input type="text" id="a-name" required /></div>
+        <div class="form-group"><label for="a-email">Admin email</label><input type="email" id="a-email" required /></div>
+      </div>
+      <p style="font-size:0.8125rem;color:var(--foreground-muted);margin:0 0 var(--space-3)">A secure temporary password will be generated automatically and emailed to this admin — they'll be asked to change it and verify their email the first time they sign in.</p>
+      <button type="submit" class="btn btn-primary" id="create-submit">Create school</button>
+    </form>
+  </div>
+</div>
+
+<div class="card fade-in">
+  <div class="card-body">
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>School</th><th>Location</th><th>Status</th><th>Admins</th><th>Teachers</th><th>Students</th></tr></thead>
+        <tbody id="schools-body"><tr><td colspan="6">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<style>.form-subheading { font-size: 0.875rem; font-weight: 700; color: var(--foreground-muted); text-transform: uppercase; letter-spacing: 0.04em; margin: var(--space-5) 0 var(--space-3); }
+.form-subheading:first-child { margin-top: 0; }
+.clickable-row { cursor: pointer; }
+.clickable-row:hover { background: var(--surface); }</style>
+
+<script type="module">
+  const { get, post } = await import("../../assets/js/api.js");
+  const { escapeHtml } = await import("../../assets/js/utils.js");
+  const { toast } = await import("../../assets/js/alerts.js");
+
+  const createCard = document.getElementById("create-card");
+  const body = document.getElementById("schools-body");
+
+  document.getElementById("toggle-create").addEventListener("click", () => {
+    createCard.style.display = createCard.style.display === "none" ? "" : "none";
+  });
+
+  async function load() {
+    try {
+      const schools = await get("/super-admin/schools");
+      body.innerHTML = schools.length
+        ? schools.map((s) => `<tr class="clickable-row" data-id="${s.id}">
+            <td data-label="School"><strong>${escapeHtml(s.name)}</strong></td>
+            <td data-label="Location">${escapeHtml(s.district || "—")}${s.province ? ", " + escapeHtml(s.province) : ""}</td>
+            <td data-label="Status"><span class="badge ${s.is_active === false ? "badge-danger" : "badge-success"}">${s.is_active === false ? "Deactivated" : "Active"}</span></td>
+            <td data-label="Admins">${s.admin_count}</td>
+            <td data-label="Teachers">${s.teacher_count}</td>
+            <td data-label="Students">${s.student_count}</td>
+          </tr>`).join("")
+        : `<tr><td colspan="6"><div class="empty-state"><h3>No schools yet</h3><p>Click "Add school" to onboard your first one.</p></div></td></tr>`;
+
+      const { navigate } = await import("../../assets/js/router.js");
+      body.querySelectorAll(".clickable-row").forEach((row) => row.addEventListener("click", () => {
+        sessionStorage.setItem("umunara_school_id", row.dataset.id);
+        navigate("/super-admin/schools/detail");
+      }));
+    } catch (err) {
+      body.innerHTML = `<tr><td colspan="6">${err.message}</td></tr>`;
+    }
+  }
+
+  document.getElementById("create-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById("create-submit");
+    btn.disabled = true;
+    btn.textContent = "Creating…";
+    try {
+      await post("/super-admin/schools", {
+        school_name: document.getElementById("s-name").value.trim(),
+        school_district: document.getElementById("s-district").value.trim() || null,
+        school_province: document.getElementById("s-province").value.trim() || null,
+        school_phone: document.getElementById("s-phone").value.trim() || null,
+        school_email: document.getElementById("s-email").value.trim() || null,
+        school_address: document.getElementById("s-address").value.trim() || null,
+        admin_fullname: document.getElementById("a-name").value.trim(),
+        admin_email: document.getElementById("a-email").value.trim(),
+      });
+      toast("School created — admin login details emailed to them", "success");
+      e.target.reset();
+      createCard.style.display = "none";
+      load();
+    } catch (err) {
+      toast(err.message || "Failed to create school", "error");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Create school";
+    }
+  });
+
+  await load();
+
+  // If the super-admin arrived here from a verified registration request
+  // (see super-admin/registrations.html), prefill this form with what the
+  // requester submitted so nothing needs retyping.
+  try {
+    const prefillRaw = sessionStorage.getItem("umunara_prefill_school");
+    if (prefillRaw) {
+      const p = JSON.parse(prefillRaw);
+      document.getElementById("s-name").value = p.name || "";
+      document.getElementById("s-district").value = p.district || "";
+      document.getElementById("s-province").value = p.province || "";
+      document.getElementById("s-phone").value = p.phone || "";
+      document.getElementById("s-email").value = p.email || "";
+      document.getElementById("s-address").value = p.address || "";
+      document.getElementById("a-name").value = p.contact_name || "";
+      document.getElementById("a-email").value = p.email || "";
+      createCard.style.display = "";
+      sessionStorage.removeItem("umunara_prefill_school");
+      toast("Prefilled from the registration request — review and create.", "info");
+    }
+  } catch { /* non-fatal */ }
+</script>

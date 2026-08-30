@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Umunara — AI-Powered Learning Platform</title>
+  <meta name="description" content="Umunara is an AI-powered learning platform for students, teachers, and administrators." />
+  <base href="/" />
+  <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg" />
+  <link rel="stylesheet" href="/assets/css/variables.css" />
+  <link rel="stylesheet" href="/assets/css/layout.css" />
+  <link rel="stylesheet" href="/assets/css/global.css" />
+</head>
+<body>
+  <div id="app" class="app-shell">
+    <aside id="sidebar" class="sidebar" aria-label="Main navigation"></aside>
+    <div id="sidebar-overlay" class="sidebar-overlay" aria-hidden="true"></div>
+    <div class="main-wrapper">
+      <header id="navbar" class="navbar"></header>
+      <main id="content" class="content"></main>
+      <footer id="footer" class="footer"></footer>
+    </div>
+  </div>
+
+  <div id="modal-root"></div>
+  <div id="toast-root" class="toast-container"></div>
+
+  <script type="module" src="/assets/js/config.js"></script>
+  <script type="module" src="/assets/js/utils.js"></script>
+  <script type="module" src="/assets/js/api.js"></script>
+  <script type="module" src="/assets/js/alerts.js"></script>
+  <script type="module" src="/assets/js/loader.js"></script>
+  <script type="module" src="/assets/js/auth.js"></script>
+  <script type="module" src="/assets/js/router.js"></script>
+</body>
+</html>

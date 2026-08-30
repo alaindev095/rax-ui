@@ -1,0 +1,108 @@
+<div class="page-header fade-in">
+  <div>
+    <h1>Companies</h1>
+    <p>Browse internship companies and view their full profile before you apply.</p>
+  </div>
+  <button class="btn btn-ghost" data-nav="/students/internships">Browse internships instead</button>
+</div>
+
+<div class="card fade-in intern-toolbar-card">
+  <div class="card-body intern-toolbar">
+    <div class="search-box intern-search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" id="f-search" placeholder="Search company name..." />
+    </div>
+    <select id="f-trade"><option value="">All trades</option></select>
+  </div>
+</div>
+
+<div class="company-grid fade-in" id="companies-grid" style="margin-top:var(--space-6)">
+  <div class="empty-state"><h3>Loading…</h3></div>
+</div>
+
+<style id="company-card-styles"></style>
+<style>
+  .intern-toolbar-card .card-body { padding-bottom: var(--space-5); }
+  .intern-toolbar { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; }
+  .intern-search { flex: 1 1 220px; min-width: 200px; }
+  .intern-toolbar select { width: auto; min-width: 150px; flex: 1 1 150px; }
+</style>
+
+<script type="module">
+  const { get, post } = await import("../../assets/js/api.js");
+  const { escapeHtml } = await import("../../assets/js/utils.js");
+  const { toast } = await import("../../assets/js/alerts.js");
+  const { navigate } = await import("../../assets/js/router.js");
+  const { companyCardHtml, companyCardStyles } = await import("../../assets/js/company-card.js");
+
+  document.getElementById("company-card-styles").textContent = companyCardStyles;
+
+  const grid = document.getElementById("companies-grid");
+  const searchInput = document.getElementById("f-search");
+  const tradeSelect = document.getElementById("f-trade");
+  let debounceTimer;
+  function debouncedLoad() { clearTimeout(debounceTimer); debounceTimer = setTimeout(load, 300); }
+
+  async function goToCompanyOrApply(companies, companyId, apply) {
+    const c = companies.find((x) => x.id === companyId);
+    sessionStorage.setItem("umunara_company_id", companyId);
+    if (apply && c && c.open_internships_count === 1) {
+      try {
+        const detail = await get(`/student/companies/${companyId}`);
+        const only = detail.internships.find((i) => i.status === "open");
+        if (only) {
+          await post(`/student/internships/${only.id}/apply`, {});
+          toast(`Applied to "${only.title}"!`, "success");
+          return;
+        }
+      } catch (err) {
+        toast(err.message || "Could not apply — opening company details instead", "error");
+      }
+    }
+    navigate("/students/companies/detail");
+  }
+
+  async function load() {
+    try {
+      const params = { search: searchInput.value.trim(), trade_id: tradeSelect.value };
+      Object.keys(params).forEach((k) => !params[k] && delete params[k]);
+      const companies = await get("/student/companies", params);
+      grid.innerHTML = companies.length
+        ? companies.map((c) => companyCardHtml(c, { showApply: true })).join("")
+        : `<div class="empty-state" style="grid-column:1/-1"><h3>No companies found</h3><p>Try adjusting your filters.</p></div>`;
+
+      grid.querySelectorAll(".company-card").forEach((card) => {
+        card.addEventListener("click", (e) => {
+          if (e.target.closest(".details-btn") || e.target.closest(".apply-btn")) return;
+          sessionStorage.setItem("umunara_company_id", card.dataset.id);
+          navigate("/students/companies/detail");
+        });
+      });
+      grid.querySelectorAll(".details-btn").forEach((btn) => btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        sessionStorage.setItem("umunara_company_id", btn.dataset.id);
+        navigate("/students/companies/detail");
+      }));
+      grid.querySelectorAll(".apply-btn").forEach((btn) => btn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        btn.disabled = true;
+        btn.textContent = "…";
+        await goToCompanyOrApply(companies, btn.dataset.id, true);
+        btn.disabled = false;
+        btn.textContent = "Apply";
+      }));
+    } catch (err) {
+      grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><h3>Couldn't load companies</h3><p>${err.message}</p></div>`;
+    }
+  }
+
+  try {
+    const f = await get("/student/internships/filters");
+    tradeSelect.innerHTML = `<option value="">All trades</option>` + f.trades.map((t) => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join("");
+  } catch { /* non-fatal */ }
+
+  tradeSelect.addEventListener("change", load);
+  searchInput.addEventListener("input", debouncedLoad);
+
+  await load();
+</script>

@@ -1,0 +1,68 @@
+<div class="page-header fade-in">
+  <div>
+    <h1>My Results</h1>
+    <p>Your grades by subject.</p>
+  </div>
+  <button class="btn btn-accent" data-nav="/students/ai">Improve with AI</button>
+</div>
+
+<div class="dashboard-grid fade-in" id="results-stats">
+  <div class="stat-card"><div class="stat-label">Overall average</div><div class="stat-value skeleton" style="height:1.75rem;width:3rem"></div></div>
+  <div class="stat-card"><div class="stat-label">Subjects graded</div><div class="stat-value skeleton" style="height:1.75rem;width:3rem"></div></div>
+  <div class="stat-card"><div class="stat-label">Best subject</div><div class="stat-value skeleton" style="height:1.75rem;width:3rem"></div></div>
+</div>
+
+<div class="card fade-in">
+  <div class="card-header">
+    <h2 class="section-title" style="margin:0">Subject breakdown</h2>
+  </div>
+  <div class="card-body">
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Subject</th><th>Marks</th><th>Grade</th></tr></thead>
+        <tbody id="results-body"><tr><td colspan="3">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  const { get } = await import("../assets/js/api.js");
+  const { escapeHtml } = await import("../assets/js/utils.js");
+
+  try {
+    const results = await get("/student/results");
+    const body = document.getElementById("results-body");
+
+    body.innerHTML = results.length
+      ? results.map((r) => `<tr>
+          <td data-label="Subject"><strong>${escapeHtml(r.subject_name || "General")}</strong></td>
+          <td data-label="Marks">${r.marks}</td>
+          <td data-label="Grade">${escapeHtml(r.grade || "—")}</td>
+        </tr>`).join("")
+      : `<tr><td colspan="3"><div class="empty-state"><h3>No results yet</h3><p>Your teachers haven't uploaded marks yet.</p></div></td></tr>`;
+
+    const avg = results.length ? Math.round(results.reduce((s, r) => s + Number(r.marks), 0) / results.length) : null;
+    const best = results.slice().sort((a, b) => Number(b.marks) - Number(a.marks))[0];
+
+    document.getElementById("results-stats").innerHTML = `
+      <div class="stat-card">
+        <div class="stat-label">Overall average</div>
+        <div class="stat-value">${avg !== null ? avg + "%" : "—"}</div>
+        <div class="stat-delta">Across ${results.length} subject${results.length === 1 ? "" : "s"}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Subjects graded</div>
+        <div class="stat-value">${results.length}</div>
+        <div class="stat-delta">&nbsp;</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Best subject</div>
+        <div class="stat-value">${best ? escapeHtml(best.subject_name || "General") : "—"}</div>
+        <div class="stat-delta">${best ? best.marks + "%" : "&nbsp;"}</div>
+      </div>
+    `;
+  } catch (err) {
+    document.getElementById("results-body").innerHTML = `<tr><td colspan="3">${err.message}</td></tr>`;
+  }
+</script>

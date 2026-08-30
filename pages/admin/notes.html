@@ -1,0 +1,63 @@
+<div class="page-header fade-in">
+  <div>
+    <h1>Content Library</h1>
+    <p>All notes uploaded by teachers across Umunara.</p>
+  </div>
+</div>
+
+<div class="card fade-in">
+  <div class="card-header">
+    <div class="search-box" style="width:100%;max-width:320px">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="search" id="notes-search" placeholder="Search notes..." />
+    </div>
+  </div>
+  <div class="card-body">
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Title</th><th>Teacher</th><th>Subject</th><th>Class</th><th>Uploaded</th></tr></thead>
+        <tbody id="notes-body"><tr><td colspan="5">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<style>.btn-sm { padding: var(--space-2) var(--space-4); font-size: 0.875rem; }</style>
+
+<script type="module">
+  const { get } = await import("../assets/js/api.js");
+  const { escapeHtml, formatDate, openViewer } = await import("../assets/js/utils.js");
+  
+
+  const body = document.getElementById("notes-body");
+  const search = document.getElementById("notes-search");
+  let all = [];
+
+  function render() {
+    const q = search.value.trim().toLowerCase();
+    const rows = all.filter((n) => !q || n.title.toLowerCase().includes(q) || (n.teacher_name || "").toLowerCase().includes(q));
+    body.innerHTML = rows.length
+      ? rows.map((n) => `<tr>
+          <td data-label="Title"><a href="#" class="open-link" data-title="${escapeHtml(n.title)}" data-url="${escapeHtml(n.file_url)}"><strong>${escapeHtml(n.title)}</strong></a></td>
+          <td data-label="Teacher">${escapeHtml(n.teacher_name || "—")}</td>
+          <td data-label="Subject">${escapeHtml(n.subject_name || "General")}</td>
+          <td data-label="Class">${escapeHtml(n.class_name || "All classes")}</td>
+          <td data-label="Uploaded">${formatDate(n.created_at)}</td>
+        </tr>`).join("")
+      : `<tr><td colspan="5"><div class="empty-state"><h3>No notes yet</h3></div></td></tr>`;
+
+    body.querySelectorAll(".open-link").forEach((a) => a.addEventListener("click", (e) => {
+      e.preventDefault();
+      openViewer(a.dataset.url, a.dataset.title);
+    }));
+  }
+
+  try {
+    all = await get("/admin/notes");
+    render();
+  } catch (err) {
+    body.innerHTML = `<tr><td colspan="5">${err.message}</td></tr>`;
+  }
+
+  search.addEventListener("input", render);
+</script>

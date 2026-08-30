@@ -1,0 +1,83 @@
+<div class="page-header fade-in">
+  <div>
+    <h1>Submissions</h1>
+    <p>Review student work and enter grades.</p>
+  </div>
+</div>
+
+<div class="card fade-in">
+  <div class="card-header">
+    <h2 class="section-title" style="margin:0">All submissions</h2>
+    <select id="submission-filter">
+      <option value="">All statuses</option>
+      <option value="pending">Pending</option>
+      <option value="graded">Graded</option>
+    </select>
+  </div>
+  <div class="card-body">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Student</th><th>Assignment</th><th>Submitted</th><th>File</th><th>Marks</th><th></th></tr>
+        </thead>
+        <tbody id="submissions-body"><tr><td colspan="6">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<style>
+  .btn-sm { padding: var(--space-2) var(--space-4); font-size: 0.875rem; }
+  .marks-input { width: 80px; }
+</style>
+
+<script type="module">
+  const { get, post } = await import("../assets/js/api.js");
+  const { escapeHtml, formatDate, openViewer } = await import("../assets/js/utils.js");
+  const { toast } = await import("../assets/js/alerts.js");
+
+  const body = document.getElementById("submissions-body");
+  const filter = document.getElementById("submission-filter");
+  let all = [];
+
+  function render() {
+    const f = filter.value;
+    const rows = all.filter((s) => !f || (f === "graded" ? s.marks !== null : s.marks === null));
+    body.innerHTML = rows.length
+      ? rows.map((s) => `<tr>
+          <td data-label="Student"><strong>${escapeHtml(s.student_name)}</strong></td>
+          <td data-label="Assignment">${escapeHtml(s.assignment_title)}</td>
+          <td data-label="Submitted">${formatDate(s.submitted_at)}</td>
+          <td data-label="File">${s.file_url ? `<button class="btn btn-ghost btn-sm open-file-btn" data-title="${escapeHtml(s.assignment_title)} — ${escapeHtml(s.student_name)}" data-url="${escapeHtml(s.file_url)}">Open</button>` : "—"}</td>
+          <td data-label="Marks"><input type="number" class="marks-input" data-id="${s.id}" value="${s.marks ?? ""}" min="0" max="100" placeholder="—" /></td>
+          <td><button class="btn btn-primary btn-sm grade-btn" data-id="${s.id}">Save</button></td>
+        </tr>`).join("")
+      : `<tr><td colspan="6"><div class="empty-state"><h3>Nothing here</h3><p>No submissions match this filter.</p></div></td></tr>`;
+
+    body.querySelectorAll(".open-file-btn").forEach((btn) => btn.addEventListener("click", () => {
+      openViewer(btn.dataset.url, btn.dataset.title);
+    }));
+    body.querySelectorAll(".grade-btn").forEach((btn) => btn.addEventListener("click", async () => {
+      const input = body.querySelector(`.marks-input[data-id="${btn.dataset.id}"]`);
+      const marks = Number(input.value);
+      if (Number.isNaN(marks)) return toast("Enter a valid mark", "error");
+      try {
+        await post("/teacher/grade", { submission_id: btn.dataset.id, marks });
+        toast("Grade saved", "success");
+        all = await get("/teacher/submissions");
+        render();
+      } catch (err) {
+        toast(err.message || "Grading failed", "error");
+      }
+    }));
+  }
+
+  try {
+    all = await get("/teacher/submissions");
+    render();
+  } catch (err) {
+    body.innerHTML = `<tr><td colspan="6">${err.message}</td></tr>`;
+  }
+
+  filter.addEventListener("change", render);
+</script>

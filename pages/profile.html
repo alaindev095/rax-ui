@@ -1,0 +1,218 @@
+<div class="page-header fade-in">
+  <div>
+    <h1>My Profile</h1>
+    <p>Your account details for Umunara.</p>
+  </div>
+</div>
+
+<div class="profile-layout fade-in">
+  <div class="card profile-card">
+    <div class="card-body profile-card-body">
+      <div class="profile-avatar" id="profile-avatar"></div>
+      <div class="profile-heading">
+        <h2 id="profile-name"></h2>
+        <span class="badge badge-info" id="profile-role"></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h2 class="section-title" style="margin:0">Account details</h2>
+    </div>
+    <div class="card-body">
+      <dl class="profile-detail-list">
+        <div class="profile-detail-row">
+          <dt>Full name</dt>
+          <dd id="detail-fullname">—</dd>
+        </div>
+        <div class="profile-detail-row">
+          <dt>Email</dt>
+          <dd id="detail-email">—</dd>
+        </div>
+        <div class="profile-detail-row">
+          <dt>Role</dt>
+          <dd id="detail-role">—</dd>
+        </div>
+      </dl>
+    </div>
+    <div class="card-footer profile-actions">
+      <button class="btn btn-ghost" id="profile-theme-toggle">Toggle theme</button>
+      <button class="btn btn-danger" id="profile-logout">Log out</button>
+    </div>
+  </div>
+
+  <div class="card" id="security-card">
+    <div class="card-header">
+      <h2 class="section-title" style="margin:0">Security</h2>
+    </div>
+    <div class="card-body">
+      <div id="security-summary" class="security-summary">
+        <div>
+          <p style="margin:0;font-weight:600">Password</p>
+          <p style="margin:0;color:var(--foreground-muted);font-size:0.875rem">Change your password any time.</p>
+        </div>
+        <button class="btn btn-accent" id="toggle-change-password">Change password</button>
+      </div>
+
+      <form id="change-password-form" class="change-password-form" style="display:none">
+        <div class="form-group">
+          <label for="pw-current">Current password</label>
+          <input type="password" id="pw-current" required autocomplete="current-password" />
+        </div>
+        <div class="form-group">
+          <label for="pw-new">New password</label>
+          <input type="password" id="pw-new" required autocomplete="new-password" minlength="8" placeholder="At least 8 characters" />
+        </div>
+        <div class="form-group">
+          <label for="pw-confirm">Confirm new password</label>
+          <input type="password" id="pw-confirm" required autocomplete="new-password" minlength="8" />
+        </div>
+        <div class="change-password-actions">
+          <button type="button" class="btn btn-ghost" id="cancel-change-password">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="save-change-password">Save new password</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<style>
+  .profile-layout { display: flex; flex-direction: column; gap: var(--space-6); max-width: 640px; }
+  .profile-card-body { display: flex; align-items: center; gap: var(--space-5); }
+  .profile-avatar {
+    width: 4.5rem;
+    height: 4.5rem;
+    border-radius: 50%;
+    background: var(--primary);
+    color: var(--primary-foreground);
+    display: grid;
+    place-items: center;
+    font-weight: 700;
+    font-size: 1.5rem;
+    flex-shrink: 0;
+  }
+  .profile-heading { display: flex; flex-direction: column; gap: var(--space-2); }
+  .profile-heading h2 { font-size: 1.375rem; margin: 0; }
+  .profile-detail-list { display: flex; flex-direction: column; }
+  .profile-detail-row {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-4);
+    padding: var(--space-3) 0;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .profile-detail-row:last-child { border-bottom: none; }
+  .profile-detail-row dt { color: var(--foreground-muted); font-size: 0.875rem; }
+  .profile-detail-row dd { font-weight: 600; text-align: right; }
+  .profile-actions { display: flex; justify-content: flex-end; gap: var(--space-3); }
+
+  .security-summary { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
+  .change-password-form { display: flex; flex-direction: column; gap: var(--space-4); margin-top: var(--space-5); padding-top: var(--space-5); border-top: 1px solid var(--border-subtle); }
+  .change-password-actions { display: flex; justify-content: flex-end; gap: var(--space-3); }
+
+  @media (max-width: 480px) {
+    .profile-card-body { flex-wrap: wrap; }
+    .profile-avatar { width: 3.5rem; height: 3.5rem; font-size: 1.25rem; }
+    .profile-heading h2 { font-size: 1.125rem; }
+    .profile-detail-row { flex-direction: column; align-items: flex-start; gap: var(--space-1); }
+    .profile-detail-row dd { text-align: left; }
+    .profile-actions { flex-direction: column-reverse; }
+    .profile-actions .btn { width: 100%; }
+    .security-summary { flex-direction: column; align-items: flex-start; }
+    .security-summary .btn { width: 100%; }
+    .change-password-actions { flex-direction: column-reverse; }
+    .change-password-actions .btn { width: 100%; }
+  }
+</style>
+
+<script type="module">
+  const { getUser } = await import("../assets/js/auth.js");
+  const { navigate } = await import("../assets/js/router.js");
+  const { CONFIG } = await import("../assets/js/config.js");
+
+  function normalizeRole(role) {
+    if (!role) return null;
+    const normalized = String(role).toLowerCase();
+    if (normalized === "students") return "student";
+    if (normalized === "teachers") return "teacher";
+    if (normalized === "admins") return "admin";
+    return normalized;
+  }
+
+  const user = getUser();
+  if (!user) {
+    navigate("/login");
+  } else {
+    const role = normalizeRole(user.role);
+    const roleLabel = CONFIG.roles[role]?.label || user.role;
+    const avatarLetter = (user.fullname || user.email || "?").trim().charAt(0).toUpperCase();
+
+    document.getElementById("profile-avatar").textContent = avatarLetter;
+    document.getElementById("profile-name").textContent = user.fullname || "—";
+    document.getElementById("profile-role").textContent = roleLabel;
+    document.getElementById("detail-fullname").textContent = user.fullname || "—";
+    document.getElementById("detail-email").textContent = user.email || "—";
+    document.getElementById("detail-role").textContent = roleLabel;
+  }
+
+  document.getElementById("profile-logout").addEventListener("click", async () => {
+    const { logout } = await import("../assets/js/auth.js");
+    logout();
+    navigate("/login");
+  });
+
+  document.getElementById("profile-theme-toggle").addEventListener("click", async () => {
+    const { getTheme, setTheme } = await import("../assets/js/utils.js");
+    setTheme(getTheme() === "dark" ? "light" : "dark");
+  });
+
+  // --- Change password -----------------------------------------------
+  const toggleBtn = document.getElementById("toggle-change-password");
+  const cancelBtn = document.getElementById("cancel-change-password");
+  const form = document.getElementById("change-password-form");
+  const summary = document.getElementById("security-summary");
+
+  function openForm() {
+    summary.style.display = "none";
+    form.style.display = "flex";
+    document.getElementById("pw-current").focus();
+  }
+  function closeForm() {
+    form.reset();
+    form.style.display = "none";
+    summary.style.display = "flex";
+  }
+
+  toggleBtn.addEventListener("click", openForm);
+  cancelBtn.addEventListener("click", closeForm);
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const { post } = await import("../assets/js/api.js");
+    const { toast } = await import("../assets/js/alerts.js");
+    const { updateUserFlags } = await import("../assets/js/auth.js");
+
+    const current_password = document.getElementById("pw-current").value;
+    const new_password = document.getElementById("pw-new").value;
+    const confirm = document.getElementById("pw-confirm").value;
+
+    if (new_password !== confirm) return toast("New passwords don't match", "error");
+    if (new_password === current_password) return toast("New password must be different from your current one", "error");
+
+    const btn = document.getElementById("save-change-password");
+    btn.disabled = true;
+    btn.textContent = "Saving…";
+    try {
+      await post("/auth/change-password", { current_password, new_password });
+      updateUserFlags({ must_change_password: false });
+      toast("Password updated.", "success");
+      closeForm();
+    } catch (err) {
+      toast(err.message || "Could not change password", "error");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Save new password";
+    }
+  });
+</script>

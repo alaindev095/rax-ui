@@ -1,0 +1,89 @@
+<div class="page-header fade-in">
+  <div>
+    <h1>Internship Administration</h1>
+    <p>Review applications, approve students, and relay registration fees to companies.</p>
+  </div>
+  <button class="btn btn-ghost" data-nav="/admin/companies">Manage companies</button>
+</div>
+
+<div class="dashboard-grid fade-in" id="stats-grid">
+  <div class="card stat-card"><div class="card-body"><span class="stat-label">Total internships</span><span class="stat-value skeleton" style="width:3rem;height:1.75rem"></span></div></div>
+</div>
+
+<div class="card fade-in" style="margin-top:var(--space-6)">
+  <div class="card-header">
+    <h2 class="section-title" style="margin:0">All internships</h2>
+  </div>
+  <div class="card-body">
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Title</th><th>Company</th><th>Trade</th><th>Positions</th><th>Applicants</th><th>Status</th><th></th></tr></thead>
+        <tbody id="internships-body"><tr><td colspan="7">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<style>
+  .stat-card .card-body { display: flex; flex-direction: column; gap: var(--space-1); }
+  .stat-label { font-size: 0.8125rem; color: var(--foreground-muted); }
+  .stat-value { font-size: 1.75rem; font-weight: 700; }
+  .btn-sm { padding: var(--space-2) var(--space-4); font-size: 0.875rem; }
+</style>
+
+<script type="module">
+  const { get } = await import("../../assets/js/api.js");
+  const { escapeHtml } = await import("../../assets/js/utils.js");
+  const { formatRWF } = await import("../../assets/js/internships.js");
+  const { navigate } = await import("../../assets/js/router.js");
+
+  const statsGrid = document.getElementById("stats-grid");
+  const body = document.getElementById("internships-body");
+
+  function statCard(label, value, badgeClass) {
+    return `<div class="card stat-card"><div class="card-body">
+      <span class="stat-label">${label}</span>
+      <span class="stat-value">${value}</span>
+    </div></div>`;
+  }
+
+  async function loadStats() {
+    try {
+      const s = await get("/admin/internship-stats");
+      statsGrid.innerHTML = [
+        statCard("Total internships", s.total_internships),
+        statCard("Awaiting approval", s.pending_approval),
+        statCard("Approved", s.approved),
+        statCard("Rejected", s.rejected),
+        statCard("Pending company review", s.pending_company_review),
+        statCard("Accepted", s.accepted),
+      ].join("");
+    } catch { statsGrid.innerHTML = ""; }
+  }
+
+  async function loadInternships() {
+    try {
+      const items = await get("/admin/internships");
+      body.innerHTML = items.length
+        ? items.map((i) => `<tr>
+            <td data-label="Title"><strong>${escapeHtml(i.title)}</strong></td>
+            <td data-label="Company">${escapeHtml(i.company_name)}${i.company_verified ? " ✅" : ""}</td>
+            <td data-label="Trade">${escapeHtml(i.trade_name || "—")}</td>
+            <td data-label="Positions">${i.positions_available} / ${i.positions_total}</td>
+            <td data-label="Applicants">${i.applicants_count}${Number(i.pending_count) > 0 ? ` <span class="badge badge-warning">${i.pending_count} pending</span>` : ""}</td>
+            <td data-label="Status"><span class="badge ${i.status === "open" ? "badge-success" : i.status === "full" ? "badge-warning" : "badge"}">${escapeHtml(i.status)}</span></td>
+            <td><button class="btn btn-primary btn-sm view-btn" data-id="${i.id}">Review applicants</button></td>
+          </tr>`).join("")
+        : `<tr><td colspan="7"><div class="empty-state"><h3>No internships yet</h3><p>Companies haven't published any internships yet.</p></div></td></tr>`;
+
+      body.querySelectorAll(".view-btn").forEach((btn) => btn.addEventListener("click", () => {
+        sessionStorage.setItem("umunara_internship_id", btn.dataset.id);
+        navigate("/admin/internships/applications");
+      }));
+    } catch (err) {
+      body.innerHTML = `<tr><td colspan="7">${err.message}</td></tr>`;
+    }
+  }
+
+  await Promise.all([loadStats(), loadInternships()]);
+</script>

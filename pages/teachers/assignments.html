@@ -1,0 +1,201 @@
+<div class="page-header fade-in">
+  <div>
+    <h1>Assignments</h1>
+    <p>Create, schedule, and publish assignments for your classes.</p>
+  </div>
+  <button class="btn btn-accent" id="toggle-create">Create assignment</button>
+</div>
+
+<div class="card fade-in" id="create-card" style="display:none">
+  <div class="card-header"><h2 class="section-title" style="margin:0" id="form-title">New assignment</h2></div>
+  <div class="card-body">
+    <form id="create-form">
+      <div class="form-row">
+        <div class="form-group">
+          <label for="a-title">Title</label>
+          <input type="text" id="a-title" required placeholder="e.g. Linear Algebra Quiz" />
+        </div>
+        <div class="form-group">
+          <label for="a-subject">Subject</label>
+          <select id="a-subject"><option value="">General</option></select>
+        </div>
+        <div class="form-group">
+          <label for="a-class">Class <span style="color:var(--danger)">*</span></label>
+          <select id="a-class" required>
+            <option value="" disabled selected>Select a class</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="a-deadline">Deadline</label>
+          <input type="date" id="a-deadline" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="a-description">Description</label>
+        <textarea id="a-description" rows="3" placeholder="Instructions for students (optional)"></textarea>
+      </div>
+      <div class="form-group">
+        <label for="a-file">Attachment (optional)</label>
+        <input type="file" id="a-file" />
+      </div>
+      <button type="submit" class="btn btn-primary" id="create-submit">Create assignment</button>
+    </form>
+  </div>
+</div>
+
+<div class="card fade-in">
+  <div class="card-header">
+    <h2 class="section-title" style="margin:0">All assignments</h2>
+  </div>
+  <div class="card-body">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Title</th><th>Subject</th><th>Due</th><th>Submissions</th><th></th></tr>
+        </thead>
+        <tbody id="assignments-body"><tr><td colspan="5">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<style>
+  .btn-sm { padding: var(--space-2) var(--space-4); font-size: 0.875rem; }
+  .row-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; justify-content: flex-end; }
+</style>
+
+<script type="module">
+  const { get, postForm, patchForm, del } = await import("../assets/js/api.js");
+  const { escapeHtml, formatDate, openViewer } = await import("../assets/js/utils.js");
+  const { toast, confirmDialog } = await import("../assets/js/alerts.js");
+
+  const body = document.getElementById("assignments-body");
+  const createCard = document.getElementById("create-card");
+  const formTitle = document.getElementById("form-title");
+  const submitBtn = document.getElementById("create-submit");
+  const subjectSelect = document.getElementById("a-subject");
+  const classSelect = document.getElementById("a-class");
+  const titleInput = document.getElementById("a-title");
+  const descriptionInput = document.getElementById("a-description");
+  const deadlineInput = document.getElementById("a-deadline");
+  const fileInput = document.getElementById("a-file");
+  const form = document.getElementById("create-form");
+
+  // null while creating; the assignment's id while editing an existing one.
+  let editingId = null;
+
+  function resetForm() {
+    editingId = null;
+    form.reset();
+    formTitle.textContent = "New assignment";
+    submitBtn.textContent = "Create assignment";
+    fileInput.required = false;
+  }
+
+  function openForEdit(a) {
+    editingId = a.id;
+    formTitle.textContent = "Edit assignment";
+    submitBtn.textContent = "Save changes";
+    titleInput.value = a.title || "";
+    descriptionInput.value = a.description || "";
+    subjectSelect.value = a.subject_id || "";
+    classSelect.value = a.class_id || "";
+    deadlineInput.value = a.deadline ? String(a.deadline).slice(0, 10) : "";
+    fileInput.value = "";
+    createCard.style.display = "block";
+    createCard.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  document.getElementById("toggle-create").addEventListener("click", () => {
+    const opening = createCard.style.display === "none";
+    if (opening) resetForm();
+    createCard.style.display = opening ? "block" : "none";
+  });
+
+  async function loadAssignments() {
+    const assignments = await get("/teacher/assignments");
+    body.innerHTML = assignments.length
+      ? assignments.map((a) => `<tr>
+          <td data-label="Title"><strong>${escapeHtml(a.title)}</strong></td>
+          <td data-label="Subject">${escapeHtml(a.subject_name || "General")}</td>
+          <td data-label="Due">${a.deadline ? formatDate(a.deadline) : "—"}</td>
+          <td data-label="Submissions">${a.submissions_count ?? 0}</td>
+          <td>
+            <div class="row-actions">
+              ${a.file_url ? `<button class="btn btn-ghost btn-sm view-btn" data-title="${escapeHtml(a.title)}" data-url="${escapeHtml(a.file_url)}">View</button>` : ""}
+              <button class="btn btn-ghost btn-sm edit-btn" data-id="${a.id}">Edit</button>
+              <button class="btn btn-danger btn-sm delete-btn" data-id="${a.id}">Delete</button>
+            </div>
+          </td>
+        </tr>`).join("")
+      : `<tr><td colspan="5"><div class="empty-state"><h3>No assignments yet</h3><p>Create your first assignment above.</p></div></td></tr>`;
+
+    body.querySelectorAll(".view-btn").forEach((btn) => btn.addEventListener("click", () => {
+      openViewer(btn.dataset.url, btn.dataset.title);
+    }));
+    body.querySelectorAll(".edit-btn").forEach((btn) => btn.addEventListener("click", () => {
+      const a = assignments.find((x) => String(x.id) === btn.dataset.id);
+      if (a) openForEdit(a);
+    }));
+    body.querySelectorAll(".delete-btn").forEach((btn) => btn.addEventListener("click", () => {
+      confirmDialog({
+        title: "Delete assignment",
+        message: "This removes the assignment and any submissions to it. Continue?",
+        confirmText: "Delete",
+        onConfirm: async () => {
+          try {
+            await del(`/teacher/assignments/${btn.dataset.id}`);
+            toast("Assignment deleted", "success");
+            loadAssignments();
+          } catch (err) {
+            toast(err.message || "Delete failed", "error");
+          }
+        },
+      });
+    }));
+  }
+
+  try {
+    const [subjects, classes] = await Promise.all([get("/teacher/subjects"), get("/teacher/classes")]);
+    subjectSelect.innerHTML = `<option value="">General</option>` + subjects.map((s) => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join("");
+    classSelect.innerHTML = `<option value="" disabled selected>Select a class</option>` + classes.map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join("");
+  } catch {}
+
+  try {
+    await loadAssignments();
+  } catch (err) {
+    body.innerHTML = `<tr><td colspan="5">${err.message}</td></tr>`;
+  }
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const isEditing = !!editingId;
+    const fd = new FormData();
+    fd.append("title", titleInput.value.trim());
+    fd.append("description", descriptionInput.value.trim());
+    fd.append("subject_id", subjectSelect.value);
+    fd.append("class_id", classSelect.value);
+    fd.append("deadline", deadlineInput.value);
+    if (fileInput.files.length) fd.append("file", fileInput.files[0]);
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = isEditing ? "Saving…" : "Creating…";
+    try {
+      if (isEditing) {
+        await patchForm(`/teacher/assignments/${editingId}`, fd);
+        toast("Assignment updated", "success");
+      } else {
+        await postForm("/teacher/create-assignment", fd);
+        toast("Assignment created", "success");
+      }
+      resetForm();
+      createCard.style.display = "none";
+      await loadAssignments();
+    } catch (err) {
+      toast(err.message || (isEditing ? "Failed to update assignment" : "Failed to create assignment"), "error");
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = isEditing ? "Save changes" : "Create assignment";
+    }
+  });
+</script>

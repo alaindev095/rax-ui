@@ -1,0 +1,132 @@
+<div class="page-header fade-in">
+  <div>
+    <h1>My Applications</h1>
+    <p>Track the status of every internship you've applied to.</p>
+  </div>
+  <button class="btn btn-ghost" data-nav="/students/internships">Browse internships</button>
+</div>
+
+<div class="card fade-in" id="profile-card" style="display:none">
+  <div class="card-header"><h2 class="section-title" style="margin:0">Complete your profile</h2></div>
+  <div class="card-body">
+    <p style="color:var(--foreground-muted);margin-top:0">Set your trade and registration number so you can apply to internships that match your programme.</p>
+    <div class="form-row">
+      <div class="form-group">
+        <label for="profile-trade">Trade</label>
+        <select id="profile-trade"></select>
+      </div>
+      <div class="form-group">
+        <label for="profile-regno">Registration number</label>
+        <input type="text" id="profile-regno" placeholder="e.g. 2025/ST/0142" />
+      </div>
+      <div class="form-group" style="align-self:end">
+        <button class="btn btn-primary" id="profile-save" style="width:100%">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card fade-in">
+  <div class="card-body">
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Company</th><th>Internship</th><th>Trade</th><th>Applied</th><th>Status</th><th></th></tr></thead>
+        <tbody id="apps-body"><tr><td colspan="6">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<style>
+  .btn-sm { padding: var(--space-2) var(--space-4); font-size: 0.875rem; }
+  .row-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; justify-content: flex-end; }
+</style>
+
+<script type="module">
+  const { get, patch } = await import("../../assets/js/api.js");
+  const { escapeHtml, formatDate } = await import("../../assets/js/utils.js");
+  const { toast, confirmDialog } = await import("../../assets/js/alerts.js");
+  const { statusBadge } = await import("../../assets/js/internships.js");
+  const { navigate } = await import("../../assets/js/router.js");
+
+  const body = document.getElementById("apps-body");
+  const profileCard = document.getElementById("profile-card");
+  const tradeSelect = document.getElementById("profile-trade");
+
+  async function loadProfile() {
+    try {
+      const [profile, trades] = await Promise.all([
+        get("/student/me/student-profile"),
+        get("/student/trades"),
+      ]);
+      tradeSelect.innerHTML = trades.map((t) => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join("");
+      if (!profile?.trade_id) {
+        profileCard.style.display = "";
+      } else {
+        tradeSelect.value = profile.trade_id;
+        document.getElementById("profile-regno").value = profile.registration_number || "";
+      }
+    } catch { /* non-fatal */ }
+  }
+
+  document.getElementById("profile-save").addEventListener("click", async () => {
+    const btn = document.getElementById("profile-save");
+    btn.disabled = true;
+    try {
+      await patch("/student/me/student-profile", {
+        trade_id: tradeSelect.value,
+        registration_number: document.getElementById("profile-regno").value.trim(),
+      });
+      toast("Profile updated", "success");
+      profileCard.style.display = "none";
+    } catch (err) {
+      toast(err.message || "Update failed", "error");
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  async function load() {
+    try {
+      const apps = await get("/student/applications");
+      body.innerHTML = apps.length
+        ? apps.map((a) => `<tr>
+            <td data-label="Company"><strong>${escapeHtml(a.company_name)}</strong></td>
+            <td data-label="Internship">${escapeHtml(a.internship_title)}</td>
+            <td data-label="Trade">${escapeHtml(a.trade_name || "—")}</td>
+            <td data-label="Applied">${formatDate(a.applied_at)}</td>
+            <td data-label="Status">${statusBadge(a.status)}</td>
+            <td>
+              <div class="row-actions">
+                ${["pending_school", "approved_by_school"].includes(a.status) ? `<button class="btn btn-danger btn-sm cancel-btn" data-id="${a.id}">Cancel</button>` : ""}
+              </div>
+            </td>
+          </tr>`).join("")
+        : `<tr><td colspan="6"><div class="empty-state"><h3>No applications yet</h3><p>Browse internships and apply to get started.</p><button class="btn btn-primary" data-nav="/students/internships" style="margin-top:var(--space-3)">Browse internships</button></div></td></tr>`;
+
+      body.querySelectorAll(".cancel-btn").forEach((btn) => btn.addEventListener("click", () => {
+        confirmDialog({
+          title: "Cancel application",
+          message: "This withdraws your application. You can apply again later if positions remain.",
+          confirmText: "Cancel application",
+          onConfirm: async () => {
+            try {
+              const { post } = await import("../../assets/js/api.js");
+              await post(`/student/applications/${btn.dataset.id}/cancel`, {});
+              toast("Application cancelled", "success");
+              load();
+            } catch (err) {
+              toast(err.message || "Could not cancel", "error");
+            }
+          },
+        });
+      }));
+      body.querySelectorAll("[data-nav]").forEach((el) => el.addEventListener("click", () => navigate(el.dataset.nav)));
+    } catch (err) {
+      body.innerHTML = `<tr><td colspan="6">${err.message}</td></tr>`;
+    }
+  }
+
+  await loadProfile();
+  await load();
+</script>

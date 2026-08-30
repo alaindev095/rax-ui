@@ -1,0 +1,136 @@
+<div class="page-header fade-in">
+  <div>
+    <h1>Reports</h1>
+    <p>Student internship placements across every school and company on the platform.</p>
+  </div>
+</div>
+
+<div class="card fade-in">
+  <div class="card-body">
+    <form id="filter-form" class="form-row" style="align-items:flex-end">
+      <div class="form-group">
+        <label for="f-school">School</label>
+        <select id="f-school"><option value="">All schools</option></select>
+      </div>
+      <div class="form-group">
+        <label for="f-company">Company</label>
+        <select id="f-company"><option value="">All companies</option></select>
+      </div>
+      <div class="form-group">
+        <label for="f-district">District</label>
+        <select id="f-district"><option value="">All districts</option></select>
+      </div>
+      <div class="form-group">
+        <label for="f-province">Province</label>
+        <select id="f-province"><option value="">All provinces</option></select>
+      </div>
+      <div class="form-group">
+        <label for="f-status">Status</label>
+        <select id="f-status">
+          <option value="">Any status</option>
+          <option value="pending_school">Pending school approval</option>
+          <option value="approved_by_school">Approved by school</option>
+          <option value="rejected_by_school">Rejected by school</option>
+          <option value="waiting_payment">Waiting payment</option>
+          <option value="payment_confirmed">Payment confirmed</option>
+          <option value="under_company_review">Under company review</option>
+          <option value="accepted">Accepted</option>
+          <option value="rejected">Rejected</option>
+        </select>
+      </div>
+      <div class="form-group" style="flex:0"><button type="submit" class="btn btn-primary">Apply filters</button></div>
+      <div class="form-group" style="flex:0"><button type="button" class="btn btn-ghost" id="export-btn">Export to Excel</button></div>
+    </form>
+  </div>
+</div>
+
+<div class="card fade-in" style="margin-top:var(--space-6)">
+  <div class="card-header"><h2 class="section-title" style="margin:0" id="result-count">Results</h2></div>
+  <div class="card-body">
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Student</th><th>School</th><th>Class</th><th>Trade</th><th>Company</th><th>District</th><th>Province</th><th>Status</th><th>Applied</th></tr></thead>
+        <tbody id="report-body"><tr><td colspan="9">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  const { get, getBlob, downloadBlob } = await import("../assets/js/api.js");
+  const { escapeHtml, formatDate } = await import("../assets/js/utils.js");
+  const { toast } = await import("../assets/js/alerts.js");
+  const { statusBadge } = await import("../assets/js/internships.js");
+
+  const body = document.getElementById("report-body");
+  const schoolSelect = document.getElementById("f-school");
+  const companySelect = document.getElementById("f-company");
+  const districtSelect = document.getElementById("f-district");
+  const provinceSelect = document.getElementById("f-province");
+  const statusSelect = document.getElementById("f-status");
+
+  function currentFilters() {
+    const params = {};
+    if (schoolSelect.value) params.school_id = schoolSelect.value;
+    if (companySelect.value) params.company_id = companySelect.value;
+    if (districtSelect.value) params.district = districtSelect.value;
+    if (provinceSelect.value) params.province = provinceSelect.value;
+    if (statusSelect.value) params.status = statusSelect.value;
+    return params;
+  }
+
+  async function loadReport() {
+    body.innerHTML = `<tr><td colspan="9">Loading…</td></tr>`;
+    try {
+      const params = new URLSearchParams(currentFilters()).toString();
+      const rows = await get(`/super-admin/reports/student-placements${params ? "?" + params : ""}`);
+      document.getElementById("result-count").textContent = `Results (${rows.length})`;
+      body.innerHTML = rows.length
+        ? rows.map((r) => `<tr>
+            <td data-label="Student"><strong>${escapeHtml(r.student_name)}</strong><br><span style="font-size:0.75rem;color:var(--foreground-muted)">${escapeHtml(r.student_email)}</span></td>
+            <td data-label="School">${escapeHtml(r.school_name || "—")}</td>
+            <td data-label="Class">${escapeHtml(r.class_name || "—")}</td>
+            <td data-label="Trade">${escapeHtml(r.trade_name || "—")}</td>
+            <td data-label="Company">${escapeHtml(r.company_name)}</td>
+            <td data-label="District">${escapeHtml(r.district || "—")}</td>
+            <td data-label="Province">${escapeHtml(r.province || "—")}</td>
+            <td data-label="Status">${statusBadge(r.status)}</td>
+            <td data-label="Applied">${formatDate(r.applied_at)}</td>
+          </tr>`).join("")
+        : `<tr><td colspan="9"><div class="empty-state"><h3>No results</h3><p>Try different filters.</p></div></td></tr>`;
+    } catch (err) {
+      body.innerHTML = `<tr><td colspan="9">${err.message}</td></tr>`;
+    }
+  }
+
+  document.getElementById("filter-form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    loadReport();
+  });
+
+  document.getElementById("export-btn").addEventListener("click", async () => {
+    const btn = document.getElementById("export-btn");
+    btn.disabled = true;
+    btn.textContent = "Exporting…";
+    try {
+      const params = new URLSearchParams(currentFilters()).toString();
+      const blob = await getBlob(`/super-admin/reports/student-placements/export${params ? "?" + params : ""}`);
+      downloadBlob(blob, "student-placements.xlsx");
+    } catch (err) {
+      toast(err.message || "Export failed", "error");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Export to Excel";
+    }
+  });
+
+  try {
+    const filters = await get("/super-admin/reports/student-placements/filters");
+    schoolSelect.innerHTML = `<option value="">All schools</option>` + filters.schools.map((s) => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join("");
+    companySelect.innerHTML = `<option value="">All companies</option>` + filters.companies.map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join("");
+    districtSelect.innerHTML = `<option value="">All districts</option>` + filters.districts.map((d) => `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`).join("");
+    provinceSelect.innerHTML = `<option value="">All provinces</option>` + filters.provinces.map((p) => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join("");
+  } catch { /* non-fatal */ }
+
+  await loadReport();
+</script>

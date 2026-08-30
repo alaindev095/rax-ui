@@ -1,0 +1,167 @@
+<div class="page-header fade-in">
+  <div>
+    <button class="btn btn-ghost btn-sm" id="back-btn">&larr; Back to internships</button>
+  </div>
+</div>
+
+<div id="detail-root" class="fade-in">
+  <div class="empty-state"><h3>Loading…</h3></div>
+</div>
+
+<style>
+  .detail-grid { display: grid; grid-template-columns: 2fr 1fr; gap: var(--space-6); align-items: start; }
+  .detail-header { display: flex; gap: var(--space-4); align-items: flex-start; margin-bottom: var(--space-5); }
+  .detail-logo { width: 4rem; height: 4rem; border-radius: var(--radius); background: var(--primary); color: var(--primary-foreground); display: grid; place-items: center; font-weight: 700; font-size: 1.5rem; flex-shrink: 0; overflow: hidden; }
+  .detail-logo img { width: 100%; height: 100%; object-fit: cover; }
+  .detail-company { display: flex; align-items: center; gap: var(--space-2); color: var(--foreground-muted); font-weight: 600; }
+  .company-link { cursor: pointer; }
+  .company-link:hover { text-decoration: underline; }
+  .detail-logo.company-link:hover { opacity: 0.85; }
+  .detail-title { font-size: 1.5rem; margin: 4px 0; }
+  .verified-badge { display: inline-flex; align-items: center; gap: 3px; color: var(--info); font-size: 0.75rem; font-weight: 700; }
+  .detail-section { margin-bottom: var(--space-5); }
+  .detail-section h3 { font-size: 1rem; margin-bottom: var(--space-2); }
+  .detail-section p { color: var(--foreground-muted); white-space: pre-wrap; line-height: 1.6; }
+  .detail-facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: var(--space-4); }
+  .detail-fact { background: var(--surface); border-radius: var(--radius); padding: var(--space-3) var(--space-4); }
+  .detail-fact span { display: block; font-size: 0.75rem; color: var(--foreground-muted); text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 2px; }
+  .detail-fact strong { font-size: 1rem; }
+  .detail-positions-bar { height: 8px; border-radius: 999px; background: var(--surface); overflow: hidden; margin-top: var(--space-2); }
+  .detail-positions-fill { height: 100%; background: var(--teal-500); border-radius: 999px; }
+  .apply-card { position: sticky; top: var(--space-6); }
+  .apply-card .card-body { display: flex; flex-direction: column; gap: var(--space-3); }
+  .apply-fee-row { display: flex; justify-content: space-between; font-size: 0.9375rem; }
+  .apply-fee-row strong { font-size: 1.125rem; }
+  .contact-row { display: flex; gap: var(--space-2); font-size: 0.875rem; align-items: center; color: var(--foreground-muted); }
+  .trade-badges { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0; }
+
+  @media (max-width: 900px) {
+    .detail-grid { grid-template-columns: 1fr; }
+    .apply-card { position: static; }
+  }
+</style>
+
+<script type="module">
+  const { get, post } = await import("../../assets/js/api.js");
+  const { escapeHtml, formatDate } = await import("../../assets/js/utils.js");
+  const { toast, confirmDialog } = await import("../../assets/js/alerts.js");
+  const { formatRWF, internshipInitials } = await import("../../assets/js/internships.js");
+  const { navigate } = await import("../../assets/js/router.js");
+
+  const root = document.getElementById("detail-root");
+  document.getElementById("back-btn").addEventListener("click", () => navigate("/students/internships"));
+
+  const id = sessionStorage.getItem("umunara_internship_id");
+  if (!id) {
+    root.innerHTML = `<div class="empty-state"><h3>No internship selected</h3><p>Go back and pick one from the list.</p></div>`;
+  } else {
+    try {
+      const it = await get(`/student/internships/${id}`);
+      const remaining = it.positions_available;
+      const total = it.positions_total;
+      const pct = total ? Math.max(0, Math.min(100, (remaining / total) * 100)) : 0;
+      const isFull = remaining <= 0 || it.status === "full";
+      const isClosed = it.status === "closed";
+      const deadlinePassed = it.deadline && new Date(it.deadline) < new Date();
+      const cantApply = isFull || isClosed || deadlinePassed;
+
+      root.innerHTML = `
+        <div class="detail-grid">
+          <div>
+            <div class="card">
+              <div class="card-body">
+                <div class="detail-header">
+                  <div class="detail-logo company-link" id="company-logo-link" title="View company details">${it.company_logo ? `<img src="${escapeHtml(it.company_logo)}" alt="" />` : internshipInitials(it.company_name)}</div>
+                  <div>
+                    <div class="detail-company company-link" id="company-name-link" title="View company details">${escapeHtml(it.company_name)} ${it.company_verified ? `<span class="verified-badge"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Verified</span>` : ""}</div>
+                    <h1 class="detail-title">${escapeHtml(it.title)}</h1>
+                    <div class="trade-badges">${it.trades && it.trades.length ? it.trades.map((t) => `<span class="badge badge-info">${escapeHtml(t.name)}</span>`).join("") : `<span class="badge">Any trade</span>`}</div>
+                  </div>
+                </div>
+
+                <div class="detail-section">
+                  <h3>About this internship</h3>
+                  <p>${escapeHtml(it.description || "No description provided.")}</p>
+                </div>
+                <div class="detail-section">
+                  <h3>Requirements</h3>
+                  <p>${escapeHtml(it.requirements || "No specific requirements listed.")}</p>
+                </div>
+                <div class="detail-section">
+                  <h3>Details</h3>
+                  <div class="detail-facts">
+                    <div class="detail-fact"><span>Location</span><strong>${escapeHtml(it.district || "—")}${it.province ? ", " + escapeHtml(it.province) : ""}</strong></div>
+                    <div class="detail-fact"><span>Duration</span><strong>${escapeHtml(it.duration || "—")}</strong></div>
+                    <div class="detail-fact"><span>Deadline</span><strong>${it.deadline ? formatDate(it.deadline) : "No deadline"}</strong></div>
+                    <div class="detail-fact"><span>Accommodation</span><strong>${it.accommodation ? "Available" : "Not provided"}</strong></div>
+                    <div class="detail-fact"><span>Transport</span><strong>${it.transport ? "Provided" : "Not provided"}</strong></div>
+                  </div>
+                </div>
+                <div class="detail-section">
+                  <h3>Positions</h3>
+                  ${isFull ? `<p class="intern-full-tag" style="color:var(--danger);font-weight:700">No Positions Remaining</p>` : `<p>${remaining} of ${total} positions remaining</p>`}
+                  <div class="detail-positions-bar"><div class="detail-positions-fill" style="width:${pct}%"></div></div>
+                </div>
+                <div class="detail-section" style="margin-bottom:0">
+                  <h3>Company contact</h3>
+                  ${it.company_description ? `<p style="margin-bottom:var(--space-3)">${escapeHtml(it.company_description)}</p>` : ""}
+                  ${it.company_address ? `<div class="contact-row">📍 ${escapeHtml(it.company_address)}</div>` : ""}
+                  ${it.company_phone ? `<div class="contact-row">📞 ${escapeHtml(it.company_phone)}</div>` : ""}
+                  ${it.company_email ? `<div class="contact-row">✉️ ${escapeHtml(it.company_email)}</div>` : ""}
+                  ${it.company_website ? `<div class="contact-row">🔗 ${escapeHtml(it.company_website)}</div>` : ""}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card apply-card">
+            <div class="card-body">
+              <div class="apply-fee-row"><span>Registration fee</span><strong>${formatRWF(it.registration_fee)}</strong></div>
+              <div class="apply-fee-row"><span>Internship fee</span><strong>${formatRWF(it.internship_fee)}</strong></div>
+              <button class="btn btn-primary" id="apply-btn" style="width:100%" ${cantApply ? "disabled" : ""}>
+                ${isFull ? "No positions remaining" : isClosed ? "Closed" : deadlinePassed ? "Deadline passed" : "Apply now"}
+              </button>
+              <p style="font-size:0.75rem;color:var(--foreground-muted);margin:0">Your application goes to your school administrator for approval first.</p>
+            </div>
+          </div>
+        </div>`;
+
+      [document.getElementById("company-logo-link"), document.getElementById("company-name-link")].forEach((el) => {
+        el?.addEventListener("click", () => {
+          sessionStorage.setItem("umunara_company_id", it.company_id);
+          navigate("/students/companies/detail");
+        });
+      });
+
+      document.getElementById("apply-btn")?.addEventListener("click", async (e) => {
+        e.target.disabled = true;
+        e.target.textContent = "Applying…";
+        try {
+          await post(`/student/internships/${id}/apply`, {});
+          toast("Application submitted!", "success");
+          e.target.textContent = "Applied ✓";
+        } catch (err) {
+          const msg = err.message || "Could not apply";
+          e.target.disabled = false;
+          e.target.textContent = "Apply now";
+          if (/trade/i.test(msg)) {
+            confirmDialog({
+              title: "Complete your profile first",
+              message: "You need to set your trade in your profile before you can apply to internships. Would you like to do that now?",
+              confirmText: "Update profile",
+              cancelText: "Not now",
+              onConfirm: () => {
+                sessionStorage.setItem("umunara_internship_id", id);
+                navigate("/students/internships/applications");
+              },
+            });
+          } else {
+            toast(msg, "error");
+          }
+        }
+      });
+    } catch (err) {
+      root.innerHTML = `<div class="empty-state"><h3>Couldn't load internship</h3><p>${err.message}</p></div>`;
+    }
+  }
+</script>

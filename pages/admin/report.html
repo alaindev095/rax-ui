@@ -1,0 +1,213 @@
+<div class="page-header fade-in">
+  <div>
+    <h1>Reports</h1>
+    <p>A snapshot of activity across Umunara.</p>
+  </div>
+  <button class="btn btn-ghost" id="export-activity-btn">Export activity report</button>
+</div>
+
+<div class="dashboard-grid fade-in" id="report-stats">
+  <div class="stat-card"><div class="stat-label">Total users</div><div class="stat-value skeleton" style="height:1.75rem;width:3rem"></div></div>
+  <div class="stat-card"><div class="stat-label">Notes uploaded</div><div class="stat-value skeleton" style="height:1.75rem;width:3rem"></div></div>
+  <div class="stat-card"><div class="stat-label">Assignments</div><div class="stat-value skeleton" style="height:1.75rem;width:3rem"></div></div>
+  <div class="stat-card"><div class="stat-label">Classes</div><div class="stat-value skeleton" style="height:1.75rem;width:3rem"></div></div>
+</div>
+
+<div class="card fade-in">
+  <div class="card-header"><h2 class="section-title" style="margin:0">Users by role</h2></div>
+  <div class="card-body">
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Role</th><th>Count</th></tr></thead>
+        <tbody id="role-body"><tr><td colspan="2">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="card fade-in" style="margin-top:var(--space-5)">
+  <div class="card-header"><h2 class="section-title" style="margin:0">Notes per subject</h2></div>
+  <div class="card-body">
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Subject</th><th>Notes</th></tr></thead>
+        <tbody id="subject-body"><tr><td colspan="2">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Internship placements report — only shown when there is actual
+     internship activity for this school (see loadPlacements below). -->
+<div id="placements-section" style="display:none">
+  <div class="card fade-in" style="margin-top:var(--space-5)">
+    <div class="card-header"><h2 class="section-title" style="margin:0">Internship placements</h2></div>
+    <div class="card-body">
+      <form id="placements-filter-form" class="form-row" style="align-items:flex-end">
+        <div class="form-group">
+          <label for="pf-company">Company</label>
+          <select id="pf-company"><option value="">All companies</option></select>
+        </div>
+        <div class="form-group">
+          <label for="pf-district">District</label>
+          <select id="pf-district"><option value="">All districts</option></select>
+        </div>
+        <div class="form-group">
+          <label for="pf-province">Province</label>
+          <select id="pf-province"><option value="">All provinces</option></select>
+        </div>
+        <div class="form-group">
+          <label for="pf-status">Status</label>
+          <select id="pf-status">
+            <option value="">Any status</option>
+            <option value="pending_school">Pending school approval</option>
+            <option value="approved_by_school">Approved by school</option>
+            <option value="rejected_by_school">Rejected by school</option>
+            <option value="waiting_payment">Waiting payment</option>
+            <option value="payment_confirmed">Payment confirmed</option>
+            <option value="under_company_review">Under company review</option>
+            <option value="accepted">Accepted</option>
+            <option value="rejected">Rejected</option>
+          </select>
+        </div>
+        <div class="form-group" style="flex:0"><button type="submit" class="btn btn-primary">Apply filters</button></div>
+        <div class="form-group" style="flex:0"><button type="button" class="btn btn-ghost" id="export-placements-btn">Export to Excel</button></div>
+      </form>
+
+      <div class="table-wrap" style="margin-top:var(--space-5)">
+        <table>
+          <thead><tr><th>Student</th><th>Reg. No.</th><th>Class</th><th>Trade</th><th>Company</th><th>District</th><th>Province</th><th>Status</th><th>Applied</th></tr></thead>
+          <tbody id="placements-body"><tr><td colspan="9">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  const { get, getBlob, downloadBlob } = await import("../assets/js/api.js");
+  const { escapeHtml, formatDate } = await import("../assets/js/utils.js");
+  const { toast } = await import("../assets/js/alerts.js");
+  const { statusBadge } = await import("../assets/js/internships.js");
+
+  try {
+    const [users, notes, assignments, classes] = await Promise.all([
+      get("/admin/users"), get("/admin/notes"), get("/admin/assignments"), get("/admin/classes"),
+    ]);
+
+    document.getElementById("report-stats").innerHTML = `
+      <div class="stat-card"><div class="stat-label">Total users</div><div class="stat-value">${users.length}</div><div class="stat-delta">&nbsp;</div></div>
+      <div class="stat-card"><div class="stat-label">Notes uploaded</div><div class="stat-value">${notes.length}</div><div class="stat-delta">&nbsp;</div></div>
+      <div class="stat-card"><div class="stat-label">Assignments</div><div class="stat-value">${assignments.length}</div><div class="stat-delta">&nbsp;</div></div>
+      <div class="stat-card"><div class="stat-label">Classes</div><div class="stat-value">${classes.length}</div><div class="stat-delta">&nbsp;</div></div>
+    `;
+
+    const byRole = {};
+    users.forEach((u) => { byRole[u.role] = (byRole[u.role] || 0) + 1; });
+    document.getElementById("role-body").innerHTML = Object.entries(byRole)
+      .map(([role, count]) => `<tr><td data-label="Role"><span class="badge">${escapeHtml(role)}</span></td><td data-label="Count">${count}</td></tr>`).join("")
+      || `<tr><td colspan="2">No users</td></tr>`;
+
+    const bySubject = {};
+    notes.forEach((n) => {
+      const key = n.subject_name || "General";
+      bySubject[key] = (bySubject[key] || 0) + 1;
+    });
+    document.getElementById("subject-body").innerHTML = Object.entries(bySubject)
+      .map(([subject, count]) => `<tr><td data-label="Subject">${escapeHtml(subject)}</td><td data-label="Notes">${count}</td></tr>`).join("")
+      || `<tr><td colspan="2">No notes yet</td></tr>`;
+  } catch (err) {
+    toast(err.message || "Failed to load report", "error");
+  }
+
+  document.getElementById("export-activity-btn").addEventListener("click", async () => {
+    const btn = document.getElementById("export-activity-btn");
+    btn.disabled = true;
+    btn.textContent = "Exporting…";
+    try {
+      const blob = await getBlob("/admin/reports/activity/export");
+      downloadBlob(blob, "school-activity-report.xlsx");
+    } catch (err) {
+      toast(err.message || "Export failed", "error");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Export activity report";
+    }
+  });
+
+  // --- Internship placements: only shown if there's any activity at all,
+  // so schools with no internship program don't see an empty section. ---
+  const section = document.getElementById("placements-section");
+  const placementsBody = document.getElementById("placements-body");
+  const companySelect = document.getElementById("pf-company");
+  const districtSelect = document.getElementById("pf-district");
+  const provinceSelect = document.getElementById("pf-province");
+  const statusSelect = document.getElementById("pf-status");
+
+  function placementFilters() {
+    const params = {};
+    if (companySelect.value) params.company_id = companySelect.value;
+    if (districtSelect.value) params.district = districtSelect.value;
+    if (provinceSelect.value) params.province = provinceSelect.value;
+    if (statusSelect.value) params.status = statusSelect.value;
+    return params;
+  }
+
+  async function loadPlacements() {
+    try {
+      const params = new URLSearchParams(placementFilters()).toString();
+      const rows = await get(`/admin/reports/internship-placements${params ? "?" + params : ""}`);
+      placementsBody.innerHTML = rows.length
+        ? rows.map((r) => `<tr>
+            <td data-label="Student"><strong>${escapeHtml(r.student_name)}</strong><br><span style="font-size:0.75rem;color:var(--foreground-muted)">${escapeHtml(r.student_email)}</span></td>
+            <td data-label="Reg. No.">${escapeHtml(r.registration_number || "—")}</td>
+            <td data-label="Class">${escapeHtml(r.class_name || "—")}</td>
+            <td data-label="Trade">${escapeHtml(r.trade_name || "—")}</td>
+            <td data-label="Company">${escapeHtml(r.company_name)}${r.internship_deleted ? ` <span class="badge">Deleted posting</span>` : ""}</td>
+            <td data-label="District">${escapeHtml(r.district || "—")}</td>
+            <td data-label="Province">${escapeHtml(r.province || "—")}</td>
+            <td data-label="Status">${statusBadge(r.status)}</td>
+            <td data-label="Applied">${formatDate(r.applied_at)}</td>
+          </tr>`).join("")
+        : `<tr><td colspan="9"><div class="empty-state"><h3>No results</h3><p>Try different filters.</p></div></td></tr>`;
+    } catch (err) {
+      placementsBody.innerHTML = `<tr><td colspan="9">${err.message}</td></tr>`;
+    }
+  }
+
+  try {
+    // filters.companies is empty only when this school has zero internship
+    // applications — that's the "nothing going on" signal that hides the
+    // whole section rather than showing empty filters and an empty table.
+    const filters = await get("/admin/reports/internship-placements/filters");
+    const hasActivity = filters.companies.length > 0;
+    if (hasActivity) {
+      section.style.display = "";
+      companySelect.innerHTML = `<option value="">All companies</option>` + filters.companies.map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join("");
+      districtSelect.innerHTML = `<option value="">All districts</option>` + filters.districts.map((d) => `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`).join("");
+      provinceSelect.innerHTML = `<option value="">All provinces</option>` + filters.provinces.map((p) => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join("");
+      await loadPlacements();
+    }
+  } catch { /* leave the section hidden if this fails */ }
+
+  document.getElementById("placements-filter-form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    loadPlacements();
+  });
+
+  document.getElementById("export-placements-btn").addEventListener("click", async () => {
+    const btn = document.getElementById("export-placements-btn");
+    btn.disabled = true;
+    btn.textContent = "Exporting…";
+    try {
+      const params = new URLSearchParams(placementFilters()).toString();
+      const blob = await getBlob(`/admin/reports/internship-placements/export${params ? "?" + params : ""}`);
+      downloadBlob(blob, "internship-placements.xlsx");
+    } catch (err) {
+      toast(err.message || "Export failed", "error");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Export to Excel";
+    }
+  });
+</script>
