@@ -4,7 +4,7 @@ export const CONFIG = {
   version: "1.0.0",
   // Node.js backend (see /backend). Override at runtime via
   // localStorage.setItem('umunara_api_base', 'https://your-api.example.com/api')
-  apiBaseUrl: (typeof localStorage !== "undefined" && localStorage.getItem("umunara_api_base")) || "https://umunara-api.onrender.com",
+  apiBaseUrl: (typeof localStorage !== "undefined" && localStorage.getItem("umunara_api_base")) || "https://umunara-api.onrender.com/api",
   // This build talks to the real Umunara backend — mock data is no longer used.
   mockMode: false,
   defaultRole: "student",
